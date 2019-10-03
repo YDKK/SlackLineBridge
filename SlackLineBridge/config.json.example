@@ -1,0 +1,24 @@
+{
+  "slackChannels": [
+    {
+      "name": "hoge",
+      "token": "",
+      "teamId": "",
+      "channelId": "",
+      "webhookUrl": ""
+    }
+  ],
+  "lineChannels": [
+    {
+      "name": "fuga",
+      "id": ""
+    }
+  ],
+  "slackLineBridges": [
+    {
+      "slack": "hoge",
+      "line": "fuga"
+    }
+  ],
+  "lineAccessToken": ""
+}
