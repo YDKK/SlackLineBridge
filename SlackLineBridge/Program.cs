@@ -23,6 +23,7 @@ namespace SlackLineBridge
                 {
                     config.SetBasePath(Directory.GetCurrentDirectory());
                     config.AddJsonFile("config.json", false, true);
+                    config.AddJsonFile("appsettings.AWS.json", true, true);
                 })
                 .ConfigureWebHostDefaults(webBuilder =>
                 {

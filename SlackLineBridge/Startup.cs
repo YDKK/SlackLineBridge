@@ -33,11 +33,15 @@ namespace SlackLineBridge
                 x.AddConsole();
                 if (Configuration.GetValue<bool>("Logging:UseCloudWatchLogs"))
                 {
-                    var awsConfig = Configuration.GetAWSLoggingConfigSection();
-                    var accessKey = Configuration.GetValue<string>("AWS:AccessKey");
-                    var secretKey = Configuration.GetValue<string>("AWS:SecretKey");
-                    awsConfig.Config.Credentials = new BasicAWSCredentials(accessKey, secretKey);
-                    x.AddAWSProvider(awsConfig);
+                    var awsLoggingConfig = Configuration.GetAWSLoggingConfigSection();
+                    var awsConfig = Configuration.GetSection("AWS");
+                    if (awsConfig.Exists())
+                    {
+                        var accessKey = Configuration.GetValue<string>("AWS:AccessKey");
+                        var secretKey = Configuration.GetValue<string>("AWS:SecretKey");
+                        awsLoggingConfig.Config.Credentials = new BasicAWSCredentials(accessKey, secretKey);
+                    }
+                    x.AddAWSProvider(awsLoggingConfig);
                 }
             });
             services.AddControllers();
