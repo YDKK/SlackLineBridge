@@ -21,9 +21,9 @@ namespace SlackLineBridge.Controllers
     public class WebhookController : ControllerBase
     {
         private readonly ILogger<WebhookController> _logger;
-        private readonly IOptionsSnapshot<SlackChannels> _slackChannels;
-        private readonly IOptionsSnapshot<LineChannels> _lineChannels;
-        private readonly IOptionsSnapshot<SlackLineBridges> _bridges;
+        private readonly SlackChannels _slackChannels;
+        private readonly LineChannels _lineChannels;
+        private readonly SlackLineBridges _bridges;
         private readonly IHttpClientFactory _clientFactory;
 
         public WebhookController(
@@ -34,19 +34,19 @@ namespace SlackLineBridge.Controllers
             IHttpClientFactory clientFactory)
         {
             _logger = logger;
-            _slackChannels = slackChannels;
-            _lineChannels = lineChannels;
-            _bridges = bridges;
+            _slackChannels = slackChannels.Value;
+            _lineChannels = lineChannels.Value;
+            _bridges = bridges.Value;
             _clientFactory = clientFactory;
         }
 
-        [HttpPost]
+        [HttpPost("/slack")]
         public async Task<OkResult> Slack(SlackData data)
         {
             if (data.UserName == "slackbot") return Ok();
 
-            var slackChannels = _slackChannels.Value.Channels;
-            var bridges = _bridges.Value.Bridges;
+            var slackChannels = _slackChannels.Channels;
+            var bridges = _bridges.Bridges;
 
             var slackChannel = slackChannels.FirstOrDefault(x => x.Token == data.Token && x.TeamId == data.TeamId && x.ChannelId == data.ChannelId);
             if (slackChannel == null) return Ok();
@@ -54,7 +54,7 @@ namespace SlackLineBridge.Controllers
             var bridge = GetBridge(slackChannel);
             if (bridge == null) return Ok();
 
-            var lineChannel = _lineChannels.Value.Channels.FirstOrDefault(x => x.Name == bridge.Line);
+            var lineChannel = _lineChannels.Channels.FirstOrDefault(x => x.Name == bridge.Line);
             if (lineChannel == null)
             {
                 _logger.LogError($"bridge configured but cannot find target LineChannel: {bridge.Line}");
@@ -75,16 +75,19 @@ namespace SlackLineBridge.Controllers
             return Ok();
         }
 
+        [HttpPost("/line")]
         public async Task<OkResult> Line()
         {
             // TODO: check signature
             using (var reader = new StreamReader(Request.Body))
             {
-                var data = JsonConvert.DeserializeObject<dynamic>(await reader.ReadToEndAsync());
+                var json = await reader.ReadToEndAsync();
+                _logger.LogInformation("Receive request from line: " + json);
+                var data = JsonConvert.DeserializeObject<dynamic>(json);
 
                 foreach (var e in data.events)
                 {
-                    switch (e.type)
+                    switch ((string)e.type)
                     {
                         case "message":
                             {
@@ -100,7 +103,7 @@ namespace SlackLineBridge.Controllers
                                 {
                                     continue;
                                 }
-                                var slackChannel = _slackChannels.Value.Channels.FirstOrDefault(x => x.Name == bridge.Slack);
+                                var slackChannel = _slackChannels.Channels.FirstOrDefault(x => x.Name == bridge.Slack);
                                 if (slackChannel == null)
                                 {
                                     _logger.LogError($"bridge configured but cannot find target slackChannel: {bridge.Slack}");
@@ -138,7 +141,7 @@ namespace SlackLineBridge.Controllers
                                 }
 
                                 string text;
-                                switch (e.message.type)
+                                switch ((string)e.message.type)
                                 {
                                     case "text":
                                         text = e.message.text;
@@ -194,7 +197,7 @@ namespace SlackLineBridge.Controllers
         private string GetLineEventSourceId(dynamic e)
         {
             string sourceId = null;
-            switch (e.source.type)
+            switch ((string)e.source.type)
             {
                 case "user":
                     sourceId = e.source.userId;
@@ -215,16 +218,16 @@ namespace SlackLineBridge.Controllers
         private LineChannel GetLineChannel(dynamic e)
         {
             var sourceId = GetLineEventSourceId(e);
-            return _lineChannels.Value.Channels.FirstOrDefault(x => x.Id == sourceId);
+            return _lineChannels.Channels.FirstOrDefault(x => x.Id == sourceId);
         }
 
         private Models.Configurations.SlackLineBridge GetBridge(LineChannel channel)
         {
-            return _bridges.Value.Bridges.FirstOrDefault(x => x.Line == channel.Name);
+            return _bridges.Bridges.FirstOrDefault(x => x.Line == channel.Name);
         }
         private Models.Configurations.SlackLineBridge GetBridge(SlackChannel channel)
         {
-            return _bridges.Value.Bridges.FirstOrDefault(x => x.Slack == channel.Name);
+            return _bridges.Bridges.FirstOrDefault(x => x.Slack == channel.Name);
         }
     }
 }

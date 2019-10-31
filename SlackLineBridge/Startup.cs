@@ -50,9 +50,9 @@ namespace SlackLineBridge
                 c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Configuration["lineAccessToken"]);
                 c.BaseAddress = new Uri("https://api.line.me/v2/bot/");
             });
-            services.Configure<SlackChannels>(x => x = Configuration.GetSection("slackChannels").Get<SlackChannels>());
-            services.Configure<LineChannels>(x => x = Configuration.GetSection("lineChannels").Get<LineChannels>());
-            services.Configure<SlackLineBridges>(x => x = Configuration.GetSection("slackLineBridges").Get<SlackLineBridges>());
+            services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
+            services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
+            services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
