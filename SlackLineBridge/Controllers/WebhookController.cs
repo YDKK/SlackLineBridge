@@ -77,6 +77,7 @@ namespace SlackLineBridge.Controllers
 
         public async Task<OkResult> Line()
         {
+            // TODO: check signature
             using (var reader = new StreamReader(Request.Body))
             {
                 var data = JsonConvert.DeserializeObject<dynamic>(await reader.ReadToEndAsync());
@@ -163,6 +164,8 @@ namespace SlackLineBridge.Controllers
                     }
                 }
             }
+
+            return Ok();
         }
 
         private static bool IsPropertyExist(dynamic data, string name)

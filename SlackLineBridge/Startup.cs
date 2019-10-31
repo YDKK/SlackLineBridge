@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Amazon.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,19 @@ namespace SlackLineBridge
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddLogging(x =>
+            {
+                x.AddConfiguration(Configuration.GetSection("Logging"));
+                x.AddConsole();
+                if (Configuration.GetValue<bool>("Logging:UseCloudWatchLogs"))
+                {
+                    var awsConfig = Configuration.GetAWSLoggingConfigSection();
+                    var accessKey = Configuration.GetValue<string>("AWS:AccessKey");
+                    var secretKey = Configuration.GetValue<string>("AWS:SecretKey");
+                    awsConfig.Config.Credentials = new BasicAWSCredentials(accessKey, secretKey);
+                    x.AddAWSProvider(awsConfig);
+                }
+            });
             services.AddControllers();
             services.AddHttpClient("Line", c =>
             {
