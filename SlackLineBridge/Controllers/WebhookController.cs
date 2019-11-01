@@ -41,18 +41,25 @@ namespace SlackLineBridge.Controllers
         }
 
         [HttpPost("/slack")]
-        public async Task<OkResult> Slack(SlackData data)
+        public async Task<OkResult> Slack([FromForm]SlackData data)
         {
-            if (data.UserName == "slackbot") return Ok();
+            if (data.user_name == "slackbot") return Ok();
 
             var slackChannels = _slackChannels.Channels;
             var bridges = _bridges.Bridges;
 
-            var slackChannel = slackChannels.FirstOrDefault(x => x.Token == data.Token && x.TeamId == data.TeamId && x.ChannelId == data.ChannelId);
-            if (slackChannel == null) return Ok();
+            var slackChannel = slackChannels.FirstOrDefault(x => x.Token == data.token && x.TeamId == data.team_id && x.ChannelId == data.channel_id);
+            if (slackChannel == null)
+            {
+                _logger.LogInformation($"message from unknown slack channel: {data.team_id}/{data.channel_id} token={data.token}");
+                return Ok();
+            }
 
             var bridge = GetBridge(slackChannel);
-            if (bridge == null) return Ok();
+            if (bridge == null)
+            {
+                return Ok();
+            }
 
             var lineChannel = _lineChannels.Channels.FirstOrDefault(x => x.Name == bridge.Line);
             if (lineChannel == null)
@@ -68,7 +75,7 @@ namespace SlackLineBridge.Controllers
                 new
                 {
                     type = "text",
-                    text = $"{data.UserName}\r\n「{data.Text}」"
+                    text = $"{data.user_name}\r\n「{data.text}」"
                 }
             };
             var result = await _clientFactory.CreateClient("Line").PostAsync($"message/push", new StringContent(JsonConvert.SerializeObject(json), Encoding.UTF8, "application/json"));
@@ -176,7 +183,7 @@ namespace SlackLineBridge.Controllers
             if (data is ExpandoObject)
                 return ((IDictionary<string, object>)data).ContainsKey(name);
 
-            return data.GetType().GetProperty(name) != null;
+            return data[name] != null;
         }
 
         private async Task SendToSlack(string webhookUrl, string userName, string text)
