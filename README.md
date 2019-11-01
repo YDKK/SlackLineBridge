@@ -29,7 +29,7 @@ Slackへの投稿とLINEへの投稿を相互に橋渡しします．
 
 ### appsettings.AWS.json (Optional)
 
-Amazon CloudWatch Logsを使う場合，AWSの資格情報を指定することが可能．  
+Amazon CloudWatch Logsを使う場合，AWSの資格情報を指定することが可能です．  
 指定しなかった場合は[この辺](https://docs.aws.amazon.com/ja_jp/cli/latest/userguide/cli-configure-files.html)から適当に探してくるはず．
 
 ```json
