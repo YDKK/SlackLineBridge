@@ -155,7 +155,7 @@ namespace SlackLineBridge.Controllers
                                     continue;
                                 }
 
-                                await SendToSlack(slackChannel.WebhookUrl, userName, text);
+                                await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, userName, text);
                             }
                         }
                         break;
@@ -178,18 +178,19 @@ namespace SlackLineBridge.Controllers
             return Ok();
         }
 
-        private async Task SendToSlack(string webhookUrl, string userName, string text)
+        private async Task SendToSlack(string webhookUrl, string channelId, string userName, string text)
         {
             var client = _clientFactory.CreateClient();
 
             var message = new
             {
+                channel = channelId,
                 username = userName,
                 icon_emoji = ":line:",
                 text
             };
 
-            _ = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
+            await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
         }
 
         private string GetLineEventSourceId(JsonElement e)
