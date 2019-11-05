@@ -86,6 +86,28 @@ LINE側
 * LINE側の[制約](https://developers.line.biz/ja/docs/messaging-api/user-consent/)により，LINE側のユーザ名は情報の取得に同意したユーザのみ取得可能です．情報の取得に同意していないユーザは，ユーザ名の代わりに一意のIDで表示されます．
 * LINEスタンプには対応していません．
 
+## Dockerイメージ
+
+https://hub.docker.com/r/ydkk/slack-line-bridge
+
+`docker-compose.yml` の例
+```yml
+version: '3'
+services:
+  bridge:
+    restart: always
+    image: ydkk/slack-line-bridge:latest
+    volumes:
+      - ./appsettings.AWS.json:/app/appsettings.AWS.json:ro
+      - ./appsettings.json:/app/appsettings.json:ro
+      - ./config.json:/app/config.json:ro
+    networks:
+      - bridge_external_network
+networks:
+  bridge_external_network:
+    external: true
+```
+
 ## License
 
 MIT
