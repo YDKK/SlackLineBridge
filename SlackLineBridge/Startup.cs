@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SlackLineBridge.Models.Configurations;
+using SlackLineBridge.Services;
 
 namespace SlackLineBridge
 {
@@ -53,6 +55,9 @@ namespace SlackLineBridge
             services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
+            services.AddSingleton<ConcurrentQueue<(string signature, string body)>>(); //lineRequestQueue
+            services.AddSingleton(Configuration["lineChannelSecret"]);
+            services.AddHostedService<LineMessageProcessingService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
