@@ -20,5 +20,6 @@
       "line": "fuga"
     }
   ],
-  "lineAccessToken": ""
+  "lineAccessToken": "",
+  "lineChannelSecret": ""
 }
