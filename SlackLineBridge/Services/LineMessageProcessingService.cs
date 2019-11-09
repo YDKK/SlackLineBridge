@@ -203,7 +203,7 @@ namespace SlackLineBridge.Services
             var encoding = new UTF8Encoding();
 
             var textBytes = encoding.GetBytes(text);
-            var keyBytes = StringToByteArray(key);
+            var keyBytes = encoding.GetBytes(key);
 
             byte[] hashBytes;
 
@@ -213,17 +213,6 @@ namespace SlackLineBridge.Services
             }
 
             return Convert.ToBase64String(hashBytes);
-        }
-
-        private static byte[] StringToByteArray(string hex)
-        {
-            var NumberChars = hex.Length;
-            var bytes = new byte[NumberChars / 2];
-            for (int i = 0; i < NumberChars; i += 2)
-            {
-                bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
-            }
-            return bytes;
         }
     }
 }
