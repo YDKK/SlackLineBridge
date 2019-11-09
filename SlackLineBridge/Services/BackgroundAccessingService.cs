@@ -31,7 +31,7 @@ namespace SlackLineBridge.Services
             {
                 try
                 {
-                    var response = await client.GetAsync("http://localhost/health");
+                    var response = await client.PostAsync("http://localhost/line", new StringContent(""));
                     if (!response.IsSuccessStatusCode)
                     {
                         _logger.LogWarning("BackgroundAccessing failed.");
