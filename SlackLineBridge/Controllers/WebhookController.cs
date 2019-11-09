@@ -99,13 +99,19 @@ namespace SlackLineBridge.Controllers
                 return BadRequest();
             }
 
-            using (var reader = new StreamReader(Request.Body))
-            {
-                _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync()));
+            using var reader = new StreamReader(Request.Body);
 
-                return Ok();
-            }
+            _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync()));
+
+            return Ok();
         }
+
+        [HttpGet("/health")]
+        public OkResult Health()
+        {
+            return Ok();
+        }
+
 
         private IEnumerable<Models.Configurations.SlackLineBridge> GetBridges(SlackChannel channel)
         {

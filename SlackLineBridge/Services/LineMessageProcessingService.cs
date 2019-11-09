@@ -151,7 +151,7 @@ namespace SlackLineBridge.Services
                 await Task.Delay(1000, stoppingToken);
             }
 
-            _logger.LogDebug($"LineMessageProcessing background task is stopping.");
+            _logger.LogDebug($"LineMessageProcessing background task is stopped.");
         }
 
         private async Task SendToSlack(string webhookUrl, string channelId, string userName, string text)
