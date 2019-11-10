@@ -32,15 +32,10 @@ namespace SlackLineBridge.Services
                 try
                 {
                     var response = await client.PostAsync("http://localhost/line", new StringContent(""));
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        _logger.LogWarning("BackgroundAccessing failed.");
-
-                    }
                 }
                 catch
                 {
-                    _logger.LogWarning("BackgroundAccessing failed.");
+                    // ignore
                 }
 
                 await Task.Delay(1000 * 60, stoppingToken);
