@@ -1,5 +1,7 @@
 # SlackLineBridge
 
+<img src="https://img.shields.io/github/license/YDKK/SlackLineBridge" /> <a href="https://hub.docker.com/r/ydkk/slack-line-bridge"><img src="https://img.shields.io/docker/cloud/build/ydkk/slack-line-bridge" /></a>  
+
 <img src="https://user-images.githubusercontent.com/3415240/68022833-cf2dac80-fce8-11e9-96e8-c8a1c08a6352.png" width=128 />  
 Slack &lt;--> LINE Bridge
 
