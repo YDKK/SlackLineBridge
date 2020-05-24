@@ -95,8 +95,8 @@ namespace SlackLineBridge.Services
                                             if (result.IsSuccessStatusCode)
                                             {
                                                 var profileJson = await result.Content.ReadAsStreamAsync();
-                                                _logger.LogInformation($"get profile: {profileJson}");
                                                 var profile = await JsonSerializer.DeserializeAsync<JsonElement>(profileJson);
+                                                _logger.LogInformation($"get profile: {profile}");
                                                 userName = profile.GetProperty("displayName").GetString();
                                                 if (profile.TryGetProperty("pictureUrl", out var picture))
                                                 {
