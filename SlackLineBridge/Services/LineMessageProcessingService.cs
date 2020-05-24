@@ -6,6 +6,7 @@ using SlackLineBridge.Models.Configurations;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -83,34 +84,7 @@ namespace SlackLineBridge.Services
                                     {
                                         continue;
                                     }
-                                    string userName = null;
-                                    if (e.GetProperty("source").TryGetProperty("userId", out var userId))
-                                    {
-                                        var client = _clientFactory.CreateClient("Line");
-
-                                        try
-                                        {
-                                            var result = await client.GetAsync($"profile/{userId}");
-                                            if (result.IsSuccessStatusCode)
-                                            {
-                                                var profile = await JsonSerializer.DeserializeAsync<JsonElement>(await result.Content.ReadAsStreamAsync());
-                                                userName = profile.GetProperty("displayName").GetString();
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            _logger.LogError(ex, "get profile data failed");
-                                        }
-
-                                        if (userName == null)
-                                        {
-                                            userName = $"Unknown ({userId})";
-                                        }
-                                    }
-                                    else
-                                    {
-                                        userName = "Unknown";
-                                    }
+                                    var (userName, pictureUrl) = await GetLineProfileAsync(e);
 
                                     var message = e.GetProperty("message");
                                     var type = message.GetProperty("type").GetString();
@@ -119,6 +93,13 @@ namespace SlackLineBridge.Services
                                         "text" => message.GetProperty("text").GetString(),
                                         _ => $"<{type}>",
                                     };
+
+                                    string stickerUrl = null;
+                                    if (type == "sticker")
+                                    {
+                                        var stickerId = message.GetProperty("stickerId").GetString();
+                                        stickerUrl = $"https://stickershop.line-scdn.net/stickershop/v1/sticker/{stickerId}/android/sticker.png";
+                                    }
 
                                     foreach (var bridge in bridges)
                                     {
@@ -129,10 +110,11 @@ namespace SlackLineBridge.Services
                                             continue;
                                         }
 
-                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, userName, text);
+                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, stickerUrl);
                                     }
                                 }
                                 break;
+
                             default:
                                 {
                                     var sourceId = GetLineEventSourceId(e);
@@ -151,22 +133,38 @@ namespace SlackLineBridge.Services
                 await Task.Delay(1000, stoppingToken);
             }
 
-            _logger.LogDebug($"LineMessageProcessing background task is stopping.");
+            _logger.LogDebug($"LineMessageProcessing background task is stopped.");
         }
 
-        private async Task SendToSlack(string webhookUrl, string channelId, string userName, string text)
+        private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string stickerUrl)
         {
             var client = _clientFactory.CreateClient();
 
-            var message = new
+            dynamic message = new ExpandoObject();
+            message.channel = channelId;
+            message.username = userName;
+            message.text = text;
+            if (string.IsNullOrEmpty(pictureUrl))
             {
-                channel = channelId,
-                username = userName,
-                icon_emoji = ":line:",
-                text
-            };
+                message.icon_emoji = ":line:";
+            }
+            else
+            {
+                message.icon_url = pictureUrl;
+            }
 
-            await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
+            if (!string.IsNullOrEmpty(stickerUrl))
+            {
+                message.blocks = new[]{new
+                    {
+                        type = "image",
+                        image_url = stickerUrl,
+                        alt_text = "sticker"
+                    } };
+            }
+
+            var result = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(new Dictionary<string, object>(message)), Encoding.UTF8, "application/json"));
+            _logger.LogInformation($"Post to Slack: {result.StatusCode} {await result.Content.ReadAsStringAsync()}");
         }
 
         private LineChannel GetLineChannel(JsonElement e)
@@ -196,6 +194,56 @@ namespace SlackLineBridge.Services
                     _logger.LogError($"unknown source type: {type}");
                     return null;
             }
+        }
+
+        private async Task<(string userName, string pictureUrl)> GetLineProfileAsync(JsonElement e)
+        {
+            var source = e.GetProperty("source");
+            var type = source.GetProperty("type").GetString();
+            var client = _clientFactory.CreateClient("Line");
+            var resultProfile = (userName: "", pictureUrl: "");
+            var userId = source.GetProperty("userId");
+            HttpResponseMessage result = null;
+
+            try
+            {
+                switch (type)
+                {
+                    case "user":
+                        result = await client.GetAsync($"profile/{userId}");
+                        break;
+                    case "group":
+                        var groupId = source.GetProperty("groupId");
+                        result = await client.GetAsync($"group/{groupId}/member/{userId}");
+                        break;
+                    case "room":
+                        var roomId = source.GetProperty("roomId");
+                        result = await client.GetAsync($"room/{roomId}/member/{userId}");
+                        break;
+                    default:
+                        _logger.LogError($"unknown source type: {type}");
+                        break;
+                }
+
+                var profile = await JsonSerializer.DeserializeAsync<JsonElement>(await result.Content.ReadAsStreamAsync());
+                _logger.LogInformation($"get profile: {profile}");
+
+                resultProfile.userName = profile.GetProperty("displayName").GetString();
+                if (profile.TryGetProperty("pictureUrl", out var picture))
+                {
+                    resultProfile.pictureUrl = picture.GetString();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "get profile data failed");
+            }
+
+            if (string.IsNullOrEmpty(resultProfile.userName))
+            {
+                resultProfile.userName = $"Unknown ({userId})";
+            }
+            return resultProfile;
         }
 
         private static string GetHMAC(string text, string key)

@@ -58,6 +58,7 @@ namespace SlackLineBridge
             services.AddSingleton<ConcurrentQueue<(string signature, string body)>>(); //lineRequestQueue
             services.AddSingleton(Configuration["lineChannelSecret"]);
             services.AddHostedService<LineMessageProcessingService>();
+            services.AddHostedService<BackgroundAccessingService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
