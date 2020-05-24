@@ -84,6 +84,7 @@ namespace SlackLineBridge.Services
                                         continue;
                                     }
                                     string userName = null;
+                                    string pictureUrl = null;
                                     if (e.GetProperty("source").TryGetProperty("userId", out var userId))
                                     {
                                         var client = _clientFactory.CreateClient("Line");
@@ -95,6 +96,10 @@ namespace SlackLineBridge.Services
                                             {
                                                 var profile = await JsonSerializer.DeserializeAsync<JsonElement>(await result.Content.ReadAsStreamAsync());
                                                 userName = profile.GetProperty("displayName").GetString();
+                                                if (profile.TryGetProperty("pictureUrl", out var picture))
+                                                {
+                                                    pictureUrl = picture.GetString();
+                                                }
                                             }
                                         }
                                         catch (Exception ex)
@@ -120,6 +125,13 @@ namespace SlackLineBridge.Services
                                         _ => $"<{type}>",
                                     };
 
+                                    string stickerUrl = null;
+                                    if (type == "sticker")
+                                    {
+                                        var stickerId = message.GetProperty("stickerId").GetString();
+                                        stickerUrl = $"https://stickershop.line-scdn.net/stickershop/v1/sticker/{stickerId}/android/sticker.png";
+                                    }
+
                                     foreach (var bridge in bridges)
                                     {
                                         var slackChannel = _slackChannels.CurrentValue.Channels.FirstOrDefault(x => x.Name == bridge.Slack);
@@ -129,7 +141,7 @@ namespace SlackLineBridge.Services
                                             continue;
                                         }
 
-                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, userName, text);
+                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, stickerUrl);
                                     }
                                 }
                                 break;
@@ -154,17 +166,37 @@ namespace SlackLineBridge.Services
             _logger.LogDebug($"LineMessageProcessing background task is stopped.");
         }
 
-        private async Task SendToSlack(string webhookUrl, string channelId, string userName, string text)
+        private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string stickerUrl)
         {
             var client = _clientFactory.CreateClient();
 
-            var message = new
+            object message;
+            if (string.IsNullOrEmpty(stickerUrl))
             {
-                channel = channelId,
-                username = userName,
-                icon_emoji = ":line:",
-                text
-            };
+                message = new
+                {
+                    channel = channelId,
+                    username = userName,
+                    icon_emoji = !string.IsNullOrEmpty(pictureUrl) ? pictureUrl : ":line:",
+                    text
+                };
+            }
+            else
+            {
+                message = new
+                {
+                    channel = channelId,
+                    username = userName,
+                    icon_emoji = !string.IsNullOrEmpty(pictureUrl) ? pictureUrl : ":line:",
+                    text,
+                    blocks = new
+                    {
+                        type = "image",
+                        image_url = stickerUrl,
+                        alt_text = "sticker"
+                    }
+                };
+            }
 
             await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
         }
