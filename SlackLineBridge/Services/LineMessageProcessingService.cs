@@ -141,7 +141,7 @@ namespace SlackLineBridge.Services
                                             continue;
                                         }
 
-                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, stickerUrl);
+                                        await SendToSlack(_logger, slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, stickerUrl);
                                     }
                                 }
                                 break;
@@ -166,7 +166,7 @@ namespace SlackLineBridge.Services
             _logger.LogDebug($"LineMessageProcessing background task is stopped.");
         }
 
-        private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string stickerUrl)
+        private async Task SendToSlack(ILogger logger, string webhookUrl, string channelId, string pictureUrl, string userName, string text, string stickerUrl)
         {
             var client = _clientFactory.CreateClient();
 
@@ -198,7 +198,8 @@ namespace SlackLineBridge.Services
                 };
             }
 
-            await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
+            var result = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
+            logger.LogInformation($"Post to Slack: {result.StatusCode} {await result.Content.ReadAsStringAsync()}");
         }
 
         private LineChannel GetLineChannel(JsonElement e)
