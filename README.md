@@ -83,8 +83,8 @@ LINE側
 
 ## 制約
 
-* LINE側の[制約](https://developers.line.biz/ja/docs/messaging-api/user-consent/)により，LINE側のユーザ名は情報の取得に同意したユーザのみ取得可能です．情報の取得に同意していないユーザは，ユーザ名の代わりに一意のIDで表示されます．
-* LINEスタンプには対応していません．
+- LINEスタンプはLINE→Slackの一方向のみの対応です．
+- SlackのユーザアイコンはLINE側には反映されません．
 
 ## Dockerイメージ
 
