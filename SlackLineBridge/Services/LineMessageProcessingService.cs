@@ -163,7 +163,7 @@ namespace SlackLineBridge.Services
                     } };
             }
 
-            var result = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
+            var result = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(new Dictionary<string, object>(message)), Encoding.UTF8, "application/json"));
             _logger.LogInformation($"Post to Slack: {result.StatusCode} {await result.Content.ReadAsStringAsync()}");
         }
 
