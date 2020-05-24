@@ -189,12 +189,12 @@ namespace SlackLineBridge.Services
                     username = userName,
                     icon_emoji = !string.IsNullOrEmpty(pictureUrl) ? pictureUrl : ":line:",
                     text,
-                    blocks = new
+                    blocks = new[]{new
                     {
                         type = "image",
                         image_url = stickerUrl,
                         alt_text = "sticker"
-                    }
+                    }}
                 };
             }
 
