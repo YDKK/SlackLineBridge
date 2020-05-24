@@ -179,7 +179,8 @@ namespace SlackLineBridge.Services
                 {
                     channel = channelId,
                     username = userName,
-                    icon_emoji = !string.IsNullOrEmpty(pictureUrl) ? pictureUrl : ":line:",
+                    icon_emoji = string.IsNullOrEmpty(pictureUrl) ? ":line:" : "",
+                    icon_url = string.IsNullOrEmpty(pictureUrl) ? "" : pictureUrl,
                     text
                 };
             }
@@ -189,7 +190,8 @@ namespace SlackLineBridge.Services
                 {
                     channel = channelId,
                     username = userName,
-                    icon_emoji = !string.IsNullOrEmpty(pictureUrl) ? pictureUrl : ":line:",
+                    icon_emoji = string.IsNullOrEmpty(pictureUrl) ? ":line:" : "",
+                    icon_url = string.IsNullOrEmpty(pictureUrl) ? "" : pictureUrl,
                     text,
                     blocks = new[]{new
                     {
