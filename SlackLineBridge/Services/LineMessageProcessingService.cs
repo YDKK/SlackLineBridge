@@ -6,6 +6,7 @@ using SlackLineBridge.Models.Configurations;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -172,34 +173,27 @@ namespace SlackLineBridge.Services
         {
             var client = _clientFactory.CreateClient();
 
-            object message;
-            if (string.IsNullOrEmpty(stickerUrl))
+            dynamic message = new ExpandoObject();
+            message.channel = channelId;
+            message.username = userName;
+            message.text = text;
+            if (string.IsNullOrEmpty(pictureUrl))
             {
-                message = new
-                {
-                    channel = channelId,
-                    username = userName,
-                    icon_emoji = string.IsNullOrEmpty(pictureUrl) ? ":line:" : "",
-                    icon_url = string.IsNullOrEmpty(pictureUrl) ? "" : pictureUrl,
-                    text
-                };
+                message.icon_emoji = ":line:";
             }
             else
             {
-                message = new
-                {
-                    channel = channelId,
-                    username = userName,
-                    icon_emoji = string.IsNullOrEmpty(pictureUrl) ? ":line:" : "",
-                    icon_url = string.IsNullOrEmpty(pictureUrl) ? "" : pictureUrl,
-                    text,
-                    blocks = new[]{new
+                message.icon_url = pictureUrl;
+            }
+
+            if (!string.IsNullOrEmpty(stickerUrl))
+            {
+                message.blocks = new[]{new
                     {
                         type = "image",
                         image_url = stickerUrl,
                         alt_text = "sticker"
-                    }}
-                };
+                    } };
             }
 
             var result = await client.PostAsync(webhookUrl, new StringContent(JsonSerializer.Serialize(message), Encoding.UTF8, "application/json"));
