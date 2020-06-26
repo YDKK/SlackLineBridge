@@ -38,7 +38,7 @@ namespace SlackLineBridge.Controllers
             var result = await client.GetAsync($"https://api-data.line.me/v2/bot/message/{id}/content");
             if (result.IsSuccessStatusCode)
             {
-                using var stream = await result.Content.ReadAsStreamAsync();
+                var stream = await result.Content.ReadAsStreamAsync();
                 var contentType = result.Content.Headers.GetValues("Content-Type").First();
 
                 return new FileStreamResult(stream, contentType);
