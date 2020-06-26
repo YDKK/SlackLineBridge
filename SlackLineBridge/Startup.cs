@@ -55,7 +55,7 @@ namespace SlackLineBridge
             services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
-            services.AddSingleton<ConcurrentQueue<(string signature, string body)>>(); //lineRequestQueue
+            services.AddSingleton<ConcurrentQueue<(string signature, string body, string host)>>(); //lineRequestQueue
             services.AddSingleton(Configuration["lineChannelSecret"]);
             services.AddHostedService<LineMessageProcessingService>();
             services.AddHostedService<BackgroundAccessingService>();
