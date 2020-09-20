@@ -79,8 +79,41 @@ namespace SlackLineBridge.Controllers
                     {
                         new
                         {
-                            type = "text",
-                            text = $"{data.user_name}\r\n「{data.text}」"
+                            type = "flex",
+                            altText = $"{data.user_name}\r\n「{data.text}」",
+                            contents = new
+                            {
+                                type = "bubble",
+                                size = "kilo",
+                                body = new
+                                {
+                                    type = "box",
+                                    layout = "vertical",
+                                    contents = new dynamic[]
+                                    {
+                                        new
+                                        {
+                                            type = "text",
+                                            text = data.user_name,
+                                            weight = "bold",
+                                            wrap = true,
+                                            size = "xs"
+                                        },
+                                        new
+                                        {
+                                            type = "separator",
+                                            margin = "sm"
+                                        },
+                                        new
+                                        {
+                                            type = "text",
+                                            text = data.text,
+                                            wrap = true,
+                                            margin = "sm"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 };
