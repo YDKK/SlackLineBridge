@@ -81,33 +81,35 @@ namespace SlackLineBridge.Controllers
                         {
                             type = "flex",
                             altText = $"{data.user_name}\r\n「{data.text}」",
-                            contents = new {
+                            contents = new
+                            {
                                 type = "bubble",
                                 size = "kilo",
-                                body = new {
-                                    type="box",
-                                    layout="vertical",
-                                    contents = new dynamic[] 
+                                body = new
+                                {
+                                    type = "box",
+                                    layout = "vertical",
+                                    contents = new dynamic[]
                                     {
-                                        new {
+                                        new
+                                        {
                                             type = "text",
-                                            text=$"{data.user_name}",
-                                            weight="bold",
-                                            wrap=true,
-                                            size="xs"
-                                            
+                                            text = data.user_name,
+                                            weight = "bold",
+                                            wrap = true,
+                                            size = "xs"
                                         },
                                         new
                                         {
-                                            type="separator",
-                                            margin="sm"
+                                            type = "separator",
+                                            margin = "sm"
                                         },
                                         new
                                         {
-                                            type="text",
-                                            text=$"{data.text}",
-                                            wrap=true,
-                                            margin="sm"
+                                            type = "text",
+                                            text = data.text,
+                                            wrap = true,
+                                            margin = "sm"
                                         }
                                     }
                                 }
