@@ -26,14 +26,14 @@ namespace SlackLineBridge.Controllers
         private readonly LineChannels _lineChannels;
         private readonly SlackLineBridges _bridges;
         private readonly IHttpClientFactory _clientFactory;
-        private readonly ConcurrentQueue<(string signature, string body)> _lineRequestQueue;
+        private readonly ConcurrentQueue<(string signature, string body, string host)> _lineRequestQueue;
 
         public WebhookController(
             ILogger<WebhookController> logger,
             IOptionsSnapshot<SlackChannels> slackChannels,
             IOptionsSnapshot<LineChannels> lineChannels,
             IOptionsSnapshot<SlackLineBridges> bridges,
-            ConcurrentQueue<(string signature, string body)> lineRequestQueue,
+            ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
             IHttpClientFactory clientFactory)
         {
             _logger = logger;
@@ -134,7 +134,7 @@ namespace SlackLineBridge.Controllers
 
             using var reader = new StreamReader(Request.Body);
 
-            _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync()));
+            _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync(), Request.Host.ToString()));
 
             return Ok();
         }

@@ -10,6 +10,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Security.Policy;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -24,7 +25,7 @@ namespace SlackLineBridge.Services
         private readonly IOptionsMonitor<SlackLineBridges> _bridges;
         private readonly IHttpClientFactory _clientFactory;
         private readonly ILogger<LineMessageProcessingService> _logger;
-        private readonly ConcurrentQueue<(string signature, string body)> _queue;
+        private readonly ConcurrentQueue<(string signature, string body, string host)> _queue;
         private readonly string _lineChannelSecret;
 
         public LineMessageProcessingService(
@@ -32,7 +33,7 @@ namespace SlackLineBridge.Services
             IOptionsMonitor<LineChannels> lineChannels,
             IOptionsMonitor<SlackLineBridges> bridges,
             IHttpClientFactory clientFactory,
-            ConcurrentQueue<(string signature, string body)> lineRequestQueue,
+            ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
             string lineChannelSecret,
             ILogger<LineMessageProcessingService> logger)
         {
@@ -56,7 +57,7 @@ namespace SlackLineBridge.Services
                 {
                     _logger.LogInformation("Processing request from line: " + request.body);
 
-                    var signature = GetHMAC(request.body, _lineChannelSecret);
+                    var signature = GetHMACBase64(request.body, _lineChannelSecret);
                     _logger.LogDebug($"LINE signature check (expected:{request.signature}, calculated:{signature})");
                     if (request.signature != signature)
                     {
@@ -88,17 +89,33 @@ namespace SlackLineBridge.Services
 
                                     var message = e.GetProperty("message");
                                     var type = message.GetProperty("type").GetString();
-                                    var text = type switch
+                                    var text = "";
+                                    string imageUrl = null;
+                                    var id = "";
+                                    if (message.TryGetProperty("id", out var idElement))
                                     {
-                                        "text" => message.GetProperty("text").GetString(),
-                                        _ => $"<{type}>",
-                                    };
+                                        id = idElement.GetString();
+                                    }
 
-                                    string stickerUrl = null;
-                                    if (type == "sticker")
+                                    switch (type)
                                     {
-                                        var stickerId = message.GetProperty("stickerId").GetString();
-                                        stickerUrl = $"https://stickershop.line-scdn.net/stickershop/v1/sticker/{stickerId}/android/sticker.png";
+                                        case "text":
+                                            text = message.GetProperty("text").GetString();
+                                            break;
+                                        case "sticker":
+                                            var stickerId = message.GetProperty("stickerId").GetString();
+                                            imageUrl = $"https://stickershop.line-scdn.net/stickershop/v1/sticker/{stickerId}/android/sticker.png";
+                                            break;
+                                        case "image":
+                                            imageUrl = $"https://{request.host}/proxy/line/{GetHMACHex(id, _lineChannelSecret)}/{id}";
+                                            break;
+                                        default:
+                                            text = $"<{type}>";
+                                            if (!string.IsNullOrEmpty(id))
+                                            {
+                                                text += $"\nhttps://{request.host}/proxy/line/{GetHMACHex(id, _lineChannelSecret)}/{id}";
+                                            }
+                                            break;
                                     }
 
                                     foreach (var bridge in bridges)
@@ -110,7 +127,7 @@ namespace SlackLineBridge.Services
                                             continue;
                                         }
 
-                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, stickerUrl);
+                                        await SendToSlack(slackChannel.WebhookUrl, slackChannel.ChannelId, pictureUrl, userName, text, imageUrl);
                                     }
                                 }
                                 break;
@@ -136,7 +153,7 @@ namespace SlackLineBridge.Services
             _logger.LogDebug($"LineMessageProcessing background task is stopped.");
         }
 
-        private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string stickerUrl)
+        private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string imageUrl)
         {
             var client = _clientFactory.CreateClient();
 
@@ -153,13 +170,13 @@ namespace SlackLineBridge.Services
                 message.icon_url = pictureUrl;
             }
 
-            if (!string.IsNullOrEmpty(stickerUrl))
+            if (!string.IsNullOrEmpty(imageUrl))
             {
                 message.blocks = new[]{new
                     {
                         type = "image",
-                        image_url = stickerUrl,
-                        alt_text = "sticker"
+                        image_url = imageUrl,
+                        alt_text = "image"
                     } };
             }
 
@@ -246,21 +263,19 @@ namespace SlackLineBridge.Services
             return resultProfile;
         }
 
-        private static string GetHMAC(string text, string key)
+        private static byte[] CalcHMAC(string text, string key)
         {
             var encoding = new UTF8Encoding();
 
             var textBytes = encoding.GetBytes(text);
             var keyBytes = encoding.GetBytes(key);
 
-            byte[] hashBytes;
-
-            using (var hash = new HMACSHA256(keyBytes))
-            {
-                hashBytes = hash.ComputeHash(textBytes);
-            }
-
-            return Convert.ToBase64String(hashBytes);
+            using var hash = new HMACSHA256(keyBytes);
+            return hash.ComputeHash(textBytes);
         }
+
+        private static string GetHMACBase64(string text, string key) => Convert.ToBase64String(CalcHMAC(text, key));
+
+        public static string GetHMACHex(string text, string key) => BitConverter.ToString(CalcHMAC(text, key)).Replace("-", "").ToLower();
     }
 }
