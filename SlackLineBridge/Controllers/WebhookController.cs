@@ -45,7 +45,7 @@ namespace SlackLineBridge.Controllers
         }
 
         [HttpPost("/slack")]
-        public async Task<OkResult> Slack([FromForm]SlackData data)
+        public async Task<OkResult> Slack([FromForm] SlackData data)
         {
             if (data.user_name == "slackbot") return Ok();
 
@@ -123,7 +123,7 @@ namespace SlackLineBridge.Controllers
         }
 
         [HttpPost("/line")]
-        public async Task<StatusCodeResult> Line()
+        public async Task<StatusCodeResult> LineAsync()
         {
             if (!Request.Headers.ContainsKey("X-Line-Signature"))
             {
@@ -132,11 +132,23 @@ namespace SlackLineBridge.Controllers
                 return BadRequest();
             }
 
-            using var reader = new StreamReader(Request.Body);
+            string json = null;
+            string host = null;
+            try
+            {
+                using var reader = new StreamReader(Request.Body);
+                json = await reader.ReadToEndAsync();
+                host = Request.Host.ToString();
+                return Ok();
+            }
+            finally
+            {
+                Response.OnCompleted(async () =>
+                {
+                    _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], json, host));
+                });
+            }
 
-            _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync(), Request.Host.ToString()));
-
-            return Ok();
         }
 
         [HttpGet("/health")]
