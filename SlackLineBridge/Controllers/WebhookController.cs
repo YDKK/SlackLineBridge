@@ -123,7 +123,7 @@ namespace SlackLineBridge.Controllers
         }
 
         [HttpPost("/line")]
-        public async Task<StatusCodeResult> Line()
+        public StatusCodeResult Line()
         {
             if (!Request.Headers.ContainsKey("X-Line-Signature"))
             {
@@ -132,11 +132,19 @@ namespace SlackLineBridge.Controllers
                 return BadRequest();
             }
 
-            using var reader = new StreamReader(Request.Body);
+            try
+            {
+                return Ok();
+            }
+            finally
+            {
+                Response.OnCompleted(async () =>
+                {
+                    using var reader = new StreamReader(Request.Body);
+                    _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync(), Request.Host.ToString()));
+                });
+            }
 
-            _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], await reader.ReadToEndAsync(), Request.Host.ToString()));
-
-            return Ok();
         }
 
         [HttpGet("/health")]
