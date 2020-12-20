@@ -66,9 +66,8 @@ namespace SlackLineBridge.Controllers
                 return Ok();
             }
 
-            //URLタグを置換
+            //URLタグを抽出
             var urls = _urlRegex.Matches(data.text);
-            data.text = _urlRegex.Replace(data.text, "");
 
             foreach (var bridge in bridges)
             {
