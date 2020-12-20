@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -27,6 +28,7 @@ namespace SlackLineBridge.Controllers
         private readonly SlackLineBridges _bridges;
         private readonly IHttpClientFactory _clientFactory;
         private readonly ConcurrentQueue<(string signature, string body, string host)> _lineRequestQueue;
+        private static readonly Regex _urlRegex = new Regex(@"(\<(?<url>http[^\|\>]+)\|?.*?\>)");
 
         public WebhookController(
             ILogger<WebhookController> logger,
@@ -63,6 +65,10 @@ namespace SlackLineBridge.Controllers
             {
                 return Ok();
             }
+
+            //URLタグを抽出
+            var urls = _urlRegex.Matches(data.text);
+
             foreach (var bridge in bridges)
             {
                 var lineChannel = _lineChannels.Channels.FirstOrDefault(x => x.Name == bridge.Line);
@@ -72,24 +78,19 @@ namespace SlackLineBridge.Controllers
                     return Ok();
                 }
 
-                var json = new
+                var message = new
                 {
-                    to = lineChannel.Id,
-                    messages = new[]
+                    type = "flex",
+                    altText = $"{data.user_name}\r\n「{data.text}」",
+                    contents = new
                     {
-                        new
+                        type = "bubble",
+                        size = "kilo",
+                        body = new
                         {
-                            type = "flex",
-                            altText = $"{data.user_name}\r\n「{data.text}」",
-                            contents = new
-                            {
-                                type = "bubble",
-                                size = "kilo",
-                                body = new
-                                {
-                                    type = "box",
-                                    layout = "vertical",
-                                    contents = new dynamic[]
+                            type = "box",
+                            layout = "vertical",
+                            contents = new dynamic[]
                                     {
                                         new
                                         {
@@ -112,10 +113,22 @@ namespace SlackLineBridge.Controllers
                                             margin = "sm"
                                         }
                                     }
-                                }
-                            }
                         }
                     }
+                };
+                var urlMessages = urls.Select(x => x.Groups["url"].Value).Select(x => new
+                {
+                    type = "text",
+                    text = x
+                });
+
+                var json = new
+                {
+                    to = lineChannel.Id,
+                    messages = new dynamic[]
+                    {
+                        message
+                    }.Concat(urlMessages).ToArray()
                 };
                 await _clientFactory.CreateClient("Line").PostAsync($"message/push", new StringContent(JsonSerializer.Serialize(json), Encoding.UTF8, "application/json"));
             }
