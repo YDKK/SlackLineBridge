@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Samples;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
+using SlackLineBridge.Utils;
 
 namespace SlackLineBridge.Controllers
 {
@@ -29,6 +31,8 @@ namespace SlackLineBridge.Controllers
         private readonly IHttpClientFactory _clientFactory;
         private readonly ConcurrentQueue<(string signature, string body, string host)> _lineRequestQueue;
         private static readonly Regex _urlRegex = new Regex(@"(\<(?<url>http[^\|\>]+)\|?.*?\>)");
+        private readonly JsonSerializerOptions _jsonOptions;
+        private readonly string _slackSigningSecret;
 
         public WebhookController(
             ILogger<WebhookController> logger,
@@ -36,7 +40,9 @@ namespace SlackLineBridge.Controllers
             IOptionsSnapshot<LineChannels> lineChannels,
             IOptionsSnapshot<SlackLineBridges> bridges,
             ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
-            IHttpClientFactory clientFactory)
+            IHttpClientFactory clientFactory,
+            SlackSigningSecret slackSigningSecret,
+            JsonSerializerOptions jsonOptions)
         {
             _logger = logger;
             _slackChannels = slackChannels.Value;
@@ -44,6 +50,43 @@ namespace SlackLineBridge.Controllers
             _bridges = bridges.Value;
             _clientFactory = clientFactory;
             _lineRequestQueue = lineRequestQueue;
+            _slackSigningSecret = slackSigningSecret.Secret;
+            _jsonOptions = jsonOptions;
+        }
+
+        [HttpPost("/slack2")]
+        public async Task<IActionResult> Slack2([FromBody] string json)
+        {
+            _logger.LogInformation("Processing request from Slack: " + json);
+
+            var timestampStr = Request.Headers["X-Slack-Request-Timestamp"].First();
+            if (long.TryParse(timestampStr, out var timestamp))
+                if (Math.Abs(DateTimeOffset.Now.ToUnixTimeSeconds() - timestamp) <= 60 * 5)
+                {
+                    var sigBaseStr = $"v0:{timestamp}:{json}";
+                    var signature = $"v0:{Crypt.GetHMACHex(sigBaseStr, _slackSigningSecret)}";
+                    var slackSignature = Request.Headers["X-Slack-Signature"].First();
+
+                    _logger.LogDebug($"Slack signature check (expected:{slackSignature}, calculated:{signature})");
+                    if (signature == slackSignature)
+                    {
+                        // the request came from Slack!
+                        dynamic data = JsonSerializer.Deserialize<dynamic>(json, _jsonOptions);
+                        switch (data.type)
+                        {
+                            case "url_verification":
+                                return Ok(data.challenge);
+                            default:
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Slack signature missmatch.");
+                    }
+                }
+
+            return BadRequest();
         }
 
         [HttpPost("/slack")]
@@ -91,28 +134,28 @@ namespace SlackLineBridge.Controllers
                             type = "box",
                             layout = "vertical",
                             contents = new dynamic[]
+                                {
+                                    new
                                     {
-                                        new
-                                        {
-                                            type = "text",
-                                            text = data.user_name,
-                                            weight = "bold",
-                                            wrap = true,
-                                            size = "xs"
-                                        },
-                                        new
-                                        {
-                                            type = "separator",
-                                            margin = "sm"
-                                        },
-                                        new
-                                        {
-                                            type = "text",
-                                            text = data.text,
-                                            wrap = true,
-                                            margin = "sm"
-                                        }
+                                        type = "text",
+                                        text = data.user_name,
+                                        weight = "bold",
+                                        wrap = true,
+                                        size = "xs"
+                                    },
+                                    new
+                                    {
+                                        type = "separator",
+                                        margin = "sm"
+                                    },
+                                    new
+                                    {
+                                        type = "text",
+                                        text = data.text,
+                                        wrap = true,
+                                        margin = "sm"
                                     }
+                                }
                         }
                     }
                 };

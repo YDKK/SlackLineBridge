@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization.Samples;
 using System.Threading.Tasks;
 using Amazon.Runtime;
 using Microsoft.AspNetCore.Builder;
@@ -56,7 +58,11 @@ namespace SlackLineBridge
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
             services.AddSingleton<ConcurrentQueue<(string signature, string body, string host)>>(); //lineRequestQueue
-            services.AddSingleton(Configuration["lineChannelSecret"]);
+            services.AddSingleton(new LineChannelSecret(Configuration["lineChannelSecret"]));
+            services.AddSingleton(new SlackSigningSecret(Configuration["slackSigningSecret"]));
+            var jsonOptions = new JsonSerializerOptions();
+            jsonOptions.EnableDynamicTypes();
+            services.AddSingleton(jsonOptions);
             services.AddHostedService<LineMessageProcessingService>();
             services.AddHostedService<BackgroundAccessingService>();
         }
