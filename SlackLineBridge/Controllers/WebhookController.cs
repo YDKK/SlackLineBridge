@@ -74,10 +74,12 @@ namespace SlackLineBridge.Controllers
                     {
                         // the request came from Slack!
                         dynamic data = JsonSerializer.Deserialize<dynamic>(json, _jsonOptions);
-                        switch (data.type)
+                        string type = data.type;
+                        switch (type)
                         {
                             case "url_verification":
-                                return Ok(data.challenge);
+                                string challenge = data.challenge;
+                                return Ok(challenge);
                             default:
                                 break;
                         }
