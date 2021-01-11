@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
+using static System.Text.Json.Serialization.Samples.JsonSerializerExtensions;
 
 namespace SlackLineBridge.Controllers
 {
@@ -100,12 +101,12 @@ namespace SlackLineBridge.Controllers
                                         string userId = data.@event.user;
                                         string userName = await GetSlackUserName(userId);
 
-                                        dynamic[] files = data.@event.files;
+                                        JsonDynamicArray files = data.@event.files;
                                         SlackFile[] slackFiles = null;
 
                                         if (files?.Any() == true)
                                         {
-                                            slackFiles = files.Select(x => new SlackFile
+                                            slackFiles = files.Cast<dynamic>().Select(x => new SlackFile
                                             {
                                                 urlPrivate = x.url_private,
                                                 thumb360 = x.thumb_360,
