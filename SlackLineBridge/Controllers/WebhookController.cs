@@ -87,7 +87,7 @@ namespace SlackLineBridge.Controllers
                                 {
                                     case "message":
                                         var slackChannels = _slackChannels.Channels;
-                                        string teamId = data.@event.team;
+                                        string teamId = data.team_id;
                                         string channelId = data.@event.channel;
                                         var slackChannel = slackChannels.FirstOrDefault(x => x.TeamId == teamId && x.ChannelId == channelId);
                                         if (slackChannel == null)
