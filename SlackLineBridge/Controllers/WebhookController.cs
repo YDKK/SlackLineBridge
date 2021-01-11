@@ -256,7 +256,9 @@ namespace SlackLineBridge.Controllers
                         to = lineChannel.Id,
                         messages = messages.ToArray()
                     };
-                    await client.PostAsync($"message/push", new StringContent(JsonSerializer.Serialize(json), Encoding.UTF8, "application/json"));
+                    var jsonStr = JsonSerializer.Serialize(json);
+                    _logger.LogInformation("Push images to LINE: " + jsonStr);
+                    await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
                 }
             }
             return Ok();
