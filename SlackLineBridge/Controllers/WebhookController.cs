@@ -66,7 +66,7 @@ namespace SlackLineBridge.Controllers
                 if (Math.Abs(DateTimeOffset.Now.ToUnixTimeSeconds() - timestamp) <= 60 * 5)
                 {
                     var sigBaseStr = $"v0:{timestamp}:{json}";
-                    var signature = $"v0:{Crypt.GetHMACHex(sigBaseStr, _slackSigningSecret)}";
+                    var signature = $"v0={Crypt.GetHMACHex(sigBaseStr, _slackSigningSecret)}";
                     var slackSignature = Request.Headers["X-Slack-Signature"].First();
 
                     _logger.LogDebug($"Slack signature check (expected:{slackSignature}, calculated:{signature})");
