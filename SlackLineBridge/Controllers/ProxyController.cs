@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
-using SlackLineBridge.Services;
+using SlackLineBridge.Utils;
 
 namespace SlackLineBridge.Controllers
 {
@@ -28,7 +28,7 @@ namespace SlackLineBridge.Controllers
         [HttpGet("line/{token}/{id}")]
         public async Task<IActionResult> Line(string id, string token)
         {
-            if (token != LineMessageProcessingService.GetHMACHex(id, _lineChannelSecret))
+            if (token != Crypt.GetHMACHex(id, _lineChannelSecret))
             {
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
