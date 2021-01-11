@@ -244,13 +244,13 @@ namespace SlackLineBridge.Controllers
                 {
                     var messages = files.Where(x => x.mimeType.StartsWith("image")).Select(file =>
                     {
-                        var urlPrivate = HttpUtility.UrlEncode(file.urlPrivate);
-                        var urlThumb360 = HttpUtility.UrlEncode(file.thumb360);
+                        var urlPrivate = file.urlPrivate;
+                        var urlThumb360 = file.thumb360;
                         return new
                         {
                             type = "image",
-                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivate, _slackSigningSecret)}/{urlPrivate}",
-                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{urlThumb360}"
+                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlPrivate)}",
+                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlThumb360)}"
                         };
                     });
                     var json = new

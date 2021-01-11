@@ -57,14 +57,14 @@ namespace SlackLineBridge.Controllers
         {
             _logger.LogInformation($"Proxy request to Slack: {encodedUrl}, {token}");
 
-            if (token != Crypt.GetHMACHex(encodedUrl, _slackSigningSecret))
+            var url = HttpUtility.UrlDecode(encodedUrl);
+            if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
             {
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
             var client = _clientFactory.CreateClient("Slack");
 
-            var url = HttpUtility.UrlDecode(encodedUrl);
             return await ProxyContent(client, url);
         }
 
