@@ -6,8 +6,10 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Mime;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
@@ -18,11 +20,18 @@ namespace SlackLineBridge.Controllers
     [ApiController]
     public class ProxyController : ControllerBase
     {
+        private readonly ILogger<ProxyController> _logger;
         IHttpClientFactory _clientFactory;
         string _lineChannelSecret;
         string _slackSigningSecret;
-        public ProxyController(IHttpClientFactory clientFactory, LineChannelSecret lineChannelSecret, SlackSigningSecret slackSigningSecret)
+        public ProxyController(
+            ILogger<ProxyController> logger,
+            IHttpClientFactory clientFactory,
+            LineChannelSecret lineChannelSecret,
+            SlackSigningSecret slackSigningSecret
+        )
         {
+            _logger = logger;
             _clientFactory = clientFactory;
             _lineChannelSecret = lineChannelSecret.Secret;
             _slackSigningSecret = slackSigningSecret.Secret;
@@ -42,9 +51,12 @@ namespace SlackLineBridge.Controllers
             return await ProxyContent(client, url);
         }
 
-        [HttpGet("slack/{token}/{url}")]
-        public async Task<IActionResult> Slack(string url, string token)
+        [HttpGet("slack/{token}/{encodedUrl}")]
+        public async Task<IActionResult> Slack(string encodedUrl, string token)
         {
+            _logger.LogInformation($"Proxy request to Slack: {encodedUrl}, {token}");
+
+            var url = HttpUtility.UrlDecode(encodedUrl);
             if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
             {
                 return Forbid();
