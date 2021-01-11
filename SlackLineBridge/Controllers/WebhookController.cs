@@ -34,7 +34,6 @@ namespace SlackLineBridge.Controllers
         private static readonly Regex _urlRegex = new Regex(@"(\<(?<url>http[^\|\>]+)\|?.*?\>)");
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly string _slackSigningSecret;
-        private readonly string _host;
 
         public WebhookController(
             ILogger<WebhookController> logger,
@@ -54,7 +53,6 @@ namespace SlackLineBridge.Controllers
             _lineRequestQueue = lineRequestQueue;
             _slackSigningSecret = slackSigningSecret.Secret;
             _jsonOptions = jsonOptions;
-            _host = Request.Host.Host;
         }
 
         [HttpPost("/slack2")]
@@ -115,7 +113,7 @@ namespace SlackLineBridge.Controllers
                                             }).ToArray();
                                         }
 
-                                        return await PushToLine(slackChannel, userName, text, slackFiles);
+                                        return await PushToLine(Request.Host.ToString(), slackChannel, userName, text, slackFiles);
                                 }
                                 break;
                         }
@@ -154,7 +152,7 @@ namespace SlackLineBridge.Controllers
                 return Ok();
             }
 
-            return await PushToLine(slackChannel, data.user_name, data.text);
+            return await PushToLine(Request.Host.ToString(), slackChannel, data.user_name, data.text);
         }
 
         private record SlackFile
@@ -164,7 +162,7 @@ namespace SlackLineBridge.Controllers
             public string mimeType { get; set; }
         }
 
-        private async Task<IActionResult> PushToLine(SlackChannel slackChannel, string userName, string text, SlackFile[] files = null)
+        private async Task<IActionResult> PushToLine(string host, SlackChannel slackChannel, string userName, string text, SlackFile[] files = null)
         {
             var bridges = GetBridges(slackChannel);
             if (!bridges.Any())
@@ -248,8 +246,8 @@ namespace SlackLineBridge.Controllers
                         return new
                         {
                             type = "image",
-                            originalContentUrl = $"https://{_host}/proxy/slack/{Crypt.GetHMACHex(file.urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.urlPrivate)}",
-                            previewImageUrl = $"https://{_host}/proxy/slack/{Crypt.GetHMACHex(file.thumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.thumb360)}"
+                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(file.urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.urlPrivate)}",
+                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(file.thumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.thumb360)}"
                         };
                     });
                     var json = new
