@@ -55,8 +55,10 @@ namespace SlackLineBridge.Controllers
         }
 
         [HttpPost("/slack2")]
-        public async Task<IActionResult> Slack2([FromBody] string json)
+        public async Task<IActionResult> Slack2()
         {
+            using var reader = new StreamReader(Request.Body);
+            var json = await reader.ReadToEndAsync();
             _logger.LogInformation("Processing request from Slack: " + json);
 
             var timestampStr = Request.Headers["X-Slack-Request-Timestamp"].First();
