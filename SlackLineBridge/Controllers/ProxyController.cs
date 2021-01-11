@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Mime;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
+using Microsoft.Owin.Security.DataHandler.Encoder;
 
 namespace SlackLineBridge.Controllers
 {
@@ -42,7 +44,7 @@ namespace SlackLineBridge.Controllers
         {
             if (token != Crypt.GetHMACHex(id, _lineChannelSecret))
             {
-                return Forbid();
+                return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
             var client = _clientFactory.CreateClient("Line");
@@ -56,14 +58,16 @@ namespace SlackLineBridge.Controllers
         {
             _logger.LogInformation($"Proxy request to Slack: {encodedUrl}, {token}");
 
-            var url = HttpUtility.UrlDecode(encodedUrl);
-            if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
+            var encoder = new Base64UrlTextEncoder();
+
+            if (token != Crypt.GetHMACHex(encodedUrl, _slackSigningSecret))
             {
-                return Forbid();
+                return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
             var client = _clientFactory.CreateClient("Slack");
 
+            var url = Encoding.UTF8.GetString(encoder.Decode(encodedUrl));
             return await ProxyContent(client, url);
         }
 

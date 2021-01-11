@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Owin.Security.DataHandler.Encoder;
 using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
@@ -244,11 +245,15 @@ namespace SlackLineBridge.Controllers
                 {
                     var messages = files.Where(x => x.mimeType.StartsWith("image")).Select(file =>
                     {
+                        var encoder = new Base64UrlTextEncoder();
+
+                        var urlPrivateBase64 = encoder.Encode(Encoding.UTF8.GetBytes(file.urlPrivate));
+                        var urlThumb360Base64 = encoder.Encode(Encoding.UTF8.GetBytes(file.thumb360));
                         return new
                         {
                             type = "image",
-                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(file.urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.urlPrivate)}",
-                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(file.thumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(file.thumb360)}"
+                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivateBase64, _slackSigningSecret)}/{urlPrivateBase64}",
+                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360Base64, _slackSigningSecret)}/{urlThumb360Base64}"
                         };
                     });
                     var json = new
