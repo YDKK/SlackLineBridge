@@ -22,5 +22,6 @@
   ],
   "lineAccessToken": "",
   "lineChannelSecret": "",
-  "slackSigningSecret": ""
+  "slackSigningSecret": "",
+  "slackAccessToken": ""
 }

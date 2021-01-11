@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
+using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
 
 namespace SlackLineBridge.Controllers
@@ -19,10 +20,12 @@ namespace SlackLineBridge.Controllers
     {
         IHttpClientFactory _clientFactory;
         string _lineChannelSecret;
-        public ProxyController(IHttpClientFactory clientFactory, string lineChannelSecret)
+        string _slackSigningSecret;
+        public ProxyController(IHttpClientFactory clientFactory, LineChannelSecret lineChannelSecret, SlackSigningSecret slackSigningSecret)
         {
             _clientFactory = clientFactory;
-            _lineChannelSecret = lineChannelSecret;
+            _lineChannelSecret = lineChannelSecret.Secret;
+            _slackSigningSecret = slackSigningSecret.Secret;
         }
 
         [HttpGet("line/{token}/{id}")]
@@ -30,12 +33,31 @@ namespace SlackLineBridge.Controllers
         {
             if (token != Crypt.GetHMACHex(id, _lineChannelSecret))
             {
-                return new StatusCodeResult((int)HttpStatusCode.Forbidden);
+                return Forbid();
             }
 
             var client = _clientFactory.CreateClient("Line");
+            var url = $"https://api-data.line.me/v2/bot/message/{id}/content";
 
-            var result = await client.GetAsync($"https://api-data.line.me/v2/bot/message/{id}/content");
+            return await ProxyContent(client, url);
+        }
+
+        [HttpGet("slack/{token}/{url}")]
+        public async Task<IActionResult> Slack(string url, string token)
+        {
+            if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
+            {
+                return Forbid();
+            }
+
+            var client = _clientFactory.CreateClient("Slack");
+
+            return await ProxyContent(client, url);
+        }
+
+        private static async Task<IActionResult> ProxyContent(HttpClient client, string url)
+        {
+            var result = await client.GetAsync(url);
             if (result.IsSuccessStatusCode)
             {
                 var stream = await result.Content.ReadAsStreamAsync();

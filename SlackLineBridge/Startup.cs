@@ -54,6 +54,10 @@ namespace SlackLineBridge
                 c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Configuration["lineAccessToken"]);
                 c.BaseAddress = new Uri("https://api.line.me/v2/bot/");
             });
+            services.AddHttpClient("Slack", c =>
+            {
+                c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Configuration["slackAccessToken"]);
+            });
             services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
