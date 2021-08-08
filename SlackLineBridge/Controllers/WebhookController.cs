@@ -59,6 +59,12 @@ namespace SlackLineBridge.Controllers
         [HttpPost("/slack2")]
         public async Task<IActionResult> Slack2()
         {
+            //再送を無視する
+            if (Request.Headers.ContainsKey("X-Slack-Retry-Reason") && Request.Headers["X-Slack-Retry-Reason"].First() == "http_timeout")
+            {
+                return Ok();
+            }
+
             using var reader = new StreamReader(Request.Body);
             var json = await reader.ReadToEndAsync();
             _logger.LogInformation("Processing request from Slack: " + json);
