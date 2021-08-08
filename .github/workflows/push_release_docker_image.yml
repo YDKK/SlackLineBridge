@@ -1,8 +1,8 @@
-name: Push develop Docker image
+name: Push release Docker image
 
 on:
-  push:
-    branches: [develop]
+  release:
+    types: [released]
 
 jobs:
   path-context:
@@ -25,4 +25,6 @@ jobs:
           context: .
           file: SlackLineBridge/Dockerfile
           push: true
-          tags: ydkk/slack-line-bridge:develop
+          tags: |
+            ydkk/slack-line-bridge:latest
+            ydkk/slack-line-bridge:${{ github.ref }}
