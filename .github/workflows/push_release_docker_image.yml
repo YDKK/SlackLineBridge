@@ -19,6 +19,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Get release tag
+        run: |
+          tag=`echo ${{ github.ref }} | sed s=refs/tags/v==`
+          echo "::set-output name=tag::${tag}"
+        id: get-tag
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
@@ -27,4 +32,4 @@ jobs:
           push: true
           tags: |
             ydkk/slack-line-bridge:latest
-            ydkk/slack-line-bridge:${{ github.ref }}
+            ydkk/slack-line-bridge:${{ steps.get-tag.outputs.tag }}
