@@ -2,7 +2,6 @@
   "slackChannels": [
     {
       "name": "hoge",
-      "token": "",
       "teamId": "",
       "channelId": "",
       "webhookUrl": ""

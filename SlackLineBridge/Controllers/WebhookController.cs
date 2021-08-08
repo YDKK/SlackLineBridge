@@ -93,6 +93,10 @@ namespace SlackLineBridge.Controllers
                                 switch (eventType)
                                 {
                                     case "message":
+                                        if(data.@event.subtype == "bot_message")
+                                        {
+                                            return Ok();
+                                        }
                                         var slackChannels = _slackChannels.Channels;
                                         string teamId = data.team_id;
                                         string channelId = data.@event.channel;
@@ -143,23 +147,6 @@ namespace SlackLineBridge.Controllers
             string name = data.profile.display_name;
 
             return name;
-        }
-
-        [HttpPost("/slack")]
-        public async Task<IActionResult> Slack([FromForm] SlackData data)
-        {
-            if (data.user_name == "slackbot") return Ok();
-
-            var slackChannels = _slackChannels.Channels;
-
-            var slackChannel = slackChannels.FirstOrDefault(x => x.Token == data.token && x.TeamId == data.team_id && x.ChannelId == data.channel_id);
-            if (slackChannel == null)
-            {
-                _logger.LogInformation($"message from unknown slack channel: {data.team_id}/{data.channel_id} token={data.token}");
-                return Ok();
-            }
-
-            return await PushToLine(Request.Host.ToString(), slackChannel, data.user_name, data.text);
         }
 
         private record SlackFile
