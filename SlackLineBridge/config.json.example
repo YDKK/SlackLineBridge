@@ -2,7 +2,6 @@
   "slackChannels": [
     {
       "name": "hoge",
-      "token": "",
       "teamId": "",
       "channelId": "",
       "webhookUrl": ""
@@ -21,5 +20,7 @@
     }
   ],
   "lineAccessToken": "",
-  "lineChannelSecret": ""
+  "lineChannelSecret": "",
+  "slackSigningSecret": "",
+  "slackAccessToken": ""
 }

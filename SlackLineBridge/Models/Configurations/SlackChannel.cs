@@ -8,7 +8,6 @@ namespace SlackLineBridge.Models.Configurations
     public class SlackChannel
     {
         public string Name { get; set; }
-        public string Token { get; set; }
         public string TeamId { get; set; }
         public string ChannelId { get; set; }
         public string WebhookUrl { get; set; }

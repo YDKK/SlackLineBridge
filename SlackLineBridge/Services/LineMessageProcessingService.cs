@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
+using SlackLineBridge.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -34,7 +35,7 @@ namespace SlackLineBridge.Services
             IOptionsMonitor<SlackLineBridges> bridges,
             IHttpClientFactory clientFactory,
             ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
-            string lineChannelSecret,
+            LineChannelSecret lineChannelSecret,
             ILogger<LineMessageProcessingService> logger)
         {
             _slackChannels = slackChannels;
@@ -43,7 +44,7 @@ namespace SlackLineBridge.Services
             _clientFactory = clientFactory;
             _logger = logger;
             _queue = lineRequestQueue;
-            _lineChannelSecret = lineChannelSecret;
+            _lineChannelSecret = lineChannelSecret.Secret;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -57,7 +58,7 @@ namespace SlackLineBridge.Services
                 {
                     _logger.LogInformation("Processing request from line: " + request.body);
 
-                    var signature = GetHMACBase64(request.body, _lineChannelSecret);
+                    var signature = Crypt.GetHMACBase64(request.body, _lineChannelSecret);
                     _logger.LogDebug($"LINE signature check (expected:{request.signature}, calculated:{signature})");
                     if (request.signature != signature)
                     {
@@ -107,13 +108,13 @@ namespace SlackLineBridge.Services
                                             imageUrl = $"https://stickershop.line-scdn.net/stickershop/v1/sticker/{stickerId}/android/sticker.png";
                                             break;
                                         case "image":
-                                            imageUrl = $"https://{request.host}/proxy/line/{GetHMACHex(id, _lineChannelSecret)}/{id}";
+                                            imageUrl = $"https://{request.host}/proxy/line/{Crypt.GetHMACHex(id, _lineChannelSecret)}/{id}";
                                             break;
                                         default:
                                             text = $"<{type}>";
                                             if (!string.IsNullOrEmpty(id))
                                             {
-                                                text += $"\nhttps://{request.host}/proxy/line/{GetHMACHex(id, _lineChannelSecret)}/{id}";
+                                                text += $"\nhttps://{request.host}/proxy/line/{Crypt.GetHMACHex(id, _lineChannelSecret)}/{id}";
                                             }
                                             break;
                                     }
@@ -262,20 +263,5 @@ namespace SlackLineBridge.Services
             }
             return resultProfile;
         }
-
-        private static byte[] CalcHMAC(string text, string key)
-        {
-            var encoding = new UTF8Encoding();
-
-            var textBytes = encoding.GetBytes(text);
-            var keyBytes = encoding.GetBytes(key);
-
-            using var hash = new HMACSHA256(keyBytes);
-            return hash.ComputeHash(textBytes);
-        }
-
-        private static string GetHMACBase64(string text, string key) => Convert.ToBase64String(CalcHMAC(text, key));
-
-        public static string GetHMACHex(string text, string key) => BitConverter.ToString(CalcHMAC(text, key)).Replace("-", "").ToLower();
     }
 }

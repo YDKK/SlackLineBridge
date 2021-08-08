@@ -9,21 +9,24 @@ Slackへの投稿とLINEへの投稿を相互に橋渡しします．
 
 ## 仕組み
 
-![image](https://user-images.githubusercontent.com/3415240/68023213-eae58280-fce9-11e9-9fde-f7219f2bf66f.png)
+![image](https://user-images.githubusercontent.com/3415240/128625515-ea5eb6b7-8680-4ddc-97de-ce4ec896b739.png)
+
 
 ## 設定
 
 ### Slack側の設定
 
-1. 対象のチャンネルにIncoming WebhooksとOutgoing Webhooksを設定する．
-
-1. Outgoing WebhooksのPOST先を `https://ホスト名/slack` に設定する．
+1. Slack Appを作成する
+    - `Event Subscriptions` を有効にし、Request URLを `https://ホスト名/slack2` に設定する
+    - `Subscribe to bot events` で `message.channels` と `message.groups` イベントを購読する
+2. 作成したSlack Appをワークスペースにインストールする
+3. 対象のチャンネルにインストールしたSlack Appを参加させる
+4. 対象のチャンネルにIncoming Webhooksを設定する
 
 ### LINE側の設定
 
 1. LINE DevelopersからMessaging APIチャンネルを作成する．
-
-1. Webhook URLを `https://ホスト名/line` に設定する．
+2. Webhook URLを `https://ホスト名/line` に設定する．
 
 ### appsettings.json
 
@@ -53,7 +56,6 @@ Amazon CloudWatch Logsを使う場合，AWSの資格情報を指定すること�
   "slackChannels": [ // Slackチャンネルリストの定義
     {
       "name": "hoge",
-      "token": "", // Outgoing Webhooksのトークン
       "teamId": "",
       "channelId": "",
       "webhookUrl": "" // Incoming WebhooksのUrl
@@ -71,21 +73,24 @@ Amazon CloudWatch Logsを使う場合，AWSの資格情報を指定すること�
       "line": "fuga"
     }
   ],
-  "lineAccessToken": "" // LINEのアクセストークン（ロングターム）
+  "lineAccessToken": "", // LINEのアクセストークン（ロングターム）
+  "lineChannelSecret": "", // LINEのチャンネルシークレット
+  "slackSigningSecret": "", // Slack AppのSigning Secret
+  "slackAccessToken": "" // Slack AppのBot User OAuth Token
 }
 ```
 
 ## スクリーンショット
 
 Slack側  
-![image](https://user-images.githubusercontent.com/3415240/68024762-5f222500-fcee-11e9-83ed-7d6754804311.png)
+![image](https://user-images.githubusercontent.com/3415240/128625338-13d2384e-3207-4ab6-92d8-faa7cf6539cd.png)
+
 
 LINE側  
-![image](https://user-images.githubusercontent.com/3415240/68024767-63e6d900-fcee-11e9-9c78-c35b12d049ae.png)
+![image](https://user-images.githubusercontent.com/3415240/128625349-cd4c8dcc-bb36-4193-b3af-4cac9ef69853.png)
 
 ## 制約
 
-- LINEスタンプはLINE→Slackの一方向のみの対応です．
 - SlackのユーザアイコンはLINE側には反映されません．
 
 ## Dockerイメージ
