@@ -185,7 +185,7 @@ namespace SlackLineBridge.Controllers
                         contents = new
                         {
                             type = "bubble",
-                            size = "kilo",
+                            size = "giga",
                             body = new
                             {
                                 type = "box",
