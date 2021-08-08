@@ -212,6 +212,8 @@ namespace SlackLineBridge.Controllers
                                         wrap = true,
                                         margin = "sm"
                                     }
+                                }
+                            }
                         }
                     };
                     var urlMessages = urls.Select(x => x.Groups["url"].Value).Select(x => new
