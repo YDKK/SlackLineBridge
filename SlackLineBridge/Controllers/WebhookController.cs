@@ -109,7 +109,7 @@ namespace SlackLineBridge.Controllers
 
                                         string text = data.@event.text;
                                         string userId = data.@event.user;
-                                        string userName = await GetSlackUserName(userId);
+                                        var user = await GetSlackUserNameAndIcon(userId);
 
                                         JsonDynamicArray files = data.@event.files;
                                         SlackFile[] slackFiles = null;
@@ -124,7 +124,7 @@ namespace SlackLineBridge.Controllers
                                             }).ToArray();
                                         }
 
-                                        return await PushToLine(Request.Host.ToString(), slackChannel, userName, text, slackFiles);
+                                        return await PushToLine(Request.Host.ToString(), slackChannel, user.icon, user.userName, text, slackFiles);
                                 }
                                 break;
                         }
@@ -138,15 +138,15 @@ namespace SlackLineBridge.Controllers
             return BadRequest();
         }
 
-        private async Task<string> GetSlackUserName(string userId)
+        private async Task<(string userName, string icon)> GetSlackUserNameAndIcon(string userId)
         {
             var client = _clientFactory.CreateClient("Slack");
             var result = await client.GetAsync($"https://slack.com/api/users.profile.get?user={userId}");
             var json = await result.Content.ReadAsStringAsync();
             dynamic data = JsonSerializer.Deserialize<dynamic>(json, _jsonOptions);
-            string name = data.profile.display_name;
+            (string name, string icon) = (data.profile.display_name, data.profile.image_512);
 
-            return name;
+            return (name, icon);
         }
 
         private record SlackFile
@@ -156,7 +156,7 @@ namespace SlackLineBridge.Controllers
             public string mimeType { get; set; }
         }
 
-        private async Task<IActionResult> PushToLine(string host, SlackChannel slackChannel, string userName, string text, SlackFile[] files = null)
+        private async Task<IActionResult> PushToLine(string host, SlackChannel slackChannel, string userIconUrl, string userName, string text, SlackFile[] files = null)
         {
             var bridges = GetBridges(slackChannel);
             if (!bridges.Any())
@@ -180,41 +180,13 @@ namespace SlackLineBridge.Controllers
                 {
                     var message = new
                     {
-                        type = "flex",
-                        altText = $"{userName}\r\n「{text}」",
-                        contents = new
-                        {
-                            type = "bubble",
-                            size = "giga",
-                            body = new
-                            {
-                                type = "box",
-                                layout = "vertical",
-                                contents = new dynamic[]
-                                {
-                                    new
-                                    {
-                                        type = "text",
-                                        text = userName,
-                                        weight = "bold",
-                                        wrap = true,
-                                        size = "xs"
-                                    },
-                                    new
-                                    {
-                                        type = "separator",
-                                        margin = "sm"
-                                    },
-                                    new
-                                    {
-                                        type = "text",
-                                        text = text,
-                                        wrap = true,
-                                        margin = "sm"
-                                    }
-                                }
-                            }
-                        }
+                        type = "text",
+                        altText = text,
+                        text = text,
+                        sender = new {
+                            name = userName,
+                            iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
+                        },
                     };
                     var urlMessages = urls.Select(x => x.Groups["url"].Value).Select(x => new
                     {
@@ -243,7 +215,12 @@ namespace SlackLineBridge.Controllers
                         {
                             type = "image",
                             originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlPrivate)}",
-                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlThumb360)}"
+                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlThumb360)}",
+                            sender = new
+                            {
+                                name = userName,
+                                iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
+                            },
                         };
                     });
                     var json = new
