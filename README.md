@@ -92,7 +92,7 @@ LINE側
 ## 制約
 
 - ~~SlackのユーザアイコンはLINE側には反映されません．~~
-    - v4.0.0でLINE側のユーザアイコンとユーザ名の置き換えに対応しました ([#24](https://github.com/YDKK/SlackLineBridge/pull/24))\
+    - v4.0.0でLINE側のユーザアイコンとユーザ名の置き換えに対応しました ([#24](https://github.com/YDKK/SlackLineBridge/pull/24))
     - 上のスクリーンショットは更新前のものです
 
 ## Dockerイメージ
