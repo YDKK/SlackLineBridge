@@ -202,7 +202,10 @@ namespace SlackLineBridge.Controllers
                             message
                         }.Concat(urlMessages).ToArray()
                     };
-                    await client.PostAsync($"message/push", new StringContent(JsonSerializer.Serialize(json), Encoding.UTF8, "application/json"));
+                    var jsonStr = JsonSerializer.Serialize(json);
+                    _logger.LogInformation("Push message to LINE: " + jsonStr);
+                    var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
+                    _logger.LogInformation($"LINE API result [{result.StatusCode}]: " + await result.Content.ReadAsStringAsync());
                 }
 
                 if (files != null)
@@ -230,7 +233,8 @@ namespace SlackLineBridge.Controllers
                     };
                     var jsonStr = JsonSerializer.Serialize(json);
                     _logger.LogInformation("Push images to LINE: " + jsonStr);
-                    await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
+                    var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
+                    _logger.LogInformation($"LINE API result [{result.StatusCode}]: " + await result.Content.ReadAsStringAsync());
                 }
             }
             return Ok();
