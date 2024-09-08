@@ -19,24 +19,15 @@ namespace SlackLineBridge.Controllers
 {
     [Route("[controller]")]
     [ApiController]
-    public class ProxyController : ControllerBase
+    public class ProxyController(
+        ILogger<ProxyController> logger,
+        IHttpClientFactory clientFactory,
+        LineChannelSecret lineChannelSecret,
+        SlackSigningSecret slackSigningSecret
+        ) : ControllerBase
     {
-        private readonly ILogger<ProxyController> _logger;
-        IHttpClientFactory _clientFactory;
-        string _lineChannelSecret;
-        string _slackSigningSecret;
-        public ProxyController(
-            ILogger<ProxyController> logger,
-            IHttpClientFactory clientFactory,
-            LineChannelSecret lineChannelSecret,
-            SlackSigningSecret slackSigningSecret
-        )
-        {
-            _logger = logger;
-            _clientFactory = clientFactory;
-            _lineChannelSecret = lineChannelSecret.Secret;
-            _slackSigningSecret = slackSigningSecret.Secret;
-        }
+        private readonly string _lineChannelSecret = lineChannelSecret.Secret;
+        private readonly string _slackSigningSecret = slackSigningSecret.Secret;
 
         [HttpGet("line/{token}/{id}")]
         public async Task<IActionResult> Line(string id, string token)
@@ -46,7 +37,7 @@ namespace SlackLineBridge.Controllers
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
-            var client = _clientFactory.CreateClient("Line");
+            var client = clientFactory.CreateClient("Line");
             var url = $"https://api-data.line.me/v2/bot/message/{id}/content";
 
             return await ProxyContent(client, url);
@@ -55,7 +46,7 @@ namespace SlackLineBridge.Controllers
         [HttpGet("slack/{token}/{encodedUrl}")]
         public async Task<IActionResult> Slack(string encodedUrl, string token)
         {
-            _logger.LogInformation($"Proxy request to Slack: {encodedUrl}, {token}");
+            logger.LogInformation("Proxy request to Slack: {encodedUrl}, {token}", encodedUrl, token);
 
             var url = HttpUtility.UrlDecode(encodedUrl);
             if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
@@ -63,7 +54,7 @@ namespace SlackLineBridge.Controllers
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
-            var client = _clientFactory.CreateClient("Slack");
+            var client = clientFactory.CreateClient("Slack");
 
             return await ProxyContent(client, url);
         }

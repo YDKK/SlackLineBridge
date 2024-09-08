@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
@@ -24,50 +26,33 @@ namespace SlackLineBridge.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class WebhookController : ControllerBase
+    public partial class WebhookController(
+        ILogger<WebhookController> logger,
+        IOptionsSnapshot<SlackChannels> slackChannels,
+        IOptionsSnapshot<LineChannels> lineChannels,
+        IOptionsSnapshot<SlackLineBridges> bridges,
+        ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
+        IHttpClientFactory clientFactory,
+        SlackSigningSecret slackSigningSecret,
+        JsonSerializerOptions jsonOptions) : ControllerBase
     {
-        private readonly ILogger<WebhookController> _logger;
-        private readonly SlackChannels _slackChannels;
-        private readonly LineChannels _lineChannels;
-        private readonly SlackLineBridges _bridges;
-        private readonly IHttpClientFactory _clientFactory;
-        private readonly ConcurrentQueue<(string signature, string body, string host)> _lineRequestQueue;
-        private static readonly Regex _urlRegex = new Regex(@"(\<(?<url>http[^\|\>]+)\|?.*?\>)");
-        private readonly JsonSerializerOptions _jsonOptions;
-        private readonly string _slackSigningSecret;
-
-        public WebhookController(
-            ILogger<WebhookController> logger,
-            IOptionsSnapshot<SlackChannels> slackChannels,
-            IOptionsSnapshot<LineChannels> lineChannels,
-            IOptionsSnapshot<SlackLineBridges> bridges,
-            ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
-            IHttpClientFactory clientFactory,
-            SlackSigningSecret slackSigningSecret,
-            JsonSerializerOptions jsonOptions)
-        {
-            _logger = logger;
-            _slackChannels = slackChannels.Value;
-            _lineChannels = lineChannels.Value;
-            _bridges = bridges.Value;
-            _clientFactory = clientFactory;
-            _lineRequestQueue = lineRequestQueue;
-            _slackSigningSecret = slackSigningSecret.Secret;
-            _jsonOptions = jsonOptions;
-        }
+        private readonly SlackChannels _slackChannels = slackChannels.Value;
+        private readonly LineChannels _lineChannels = lineChannels.Value;
+        private readonly SlackLineBridges _bridges = bridges.Value;
+        private readonly string _slackSigningSecret = slackSigningSecret.Secret;
 
         [HttpPost("/slack2")]
         public async Task<IActionResult> Slack2()
         {
             //再送を無視する
-            if (Request.Headers.ContainsKey("X-Slack-Retry-Reason") && Request.Headers["X-Slack-Retry-Reason"].First() == "http_timeout")
+            if (Request.Headers.TryGetValue("X-Slack-Retry-Reason", out StringValues reason) && reason.First() == "http_timeout")
             {
                 return Ok();
             }
 
             using var reader = new StreamReader(Request.Body);
             var json = await reader.ReadToEndAsync();
-            _logger.LogInformation("Processing request from Slack: " + json);
+            logger.LogInformation("Processing request from Slack: {json}", json);
 
             var timestampStr = Request.Headers["X-Slack-Request-Timestamp"].First();
             if (long.TryParse(timestampStr, out var timestamp))
@@ -77,11 +62,11 @@ namespace SlackLineBridge.Controllers
                     var signature = $"v0={Crypt.GetHMACHex(sigBaseStr, _slackSigningSecret)}";
                     var slackSignature = Request.Headers["X-Slack-Signature"].First();
 
-                    _logger.LogDebug($"Slack signature check (expected:{slackSignature}, calculated:{signature})");
+                    logger.LogDebug("Slack signature check (expected:{slackSignature}, calculated:{signature})", slackSignature, signature);
                     if (signature == slackSignature)
                     {
                         // the request came from Slack!
-                        dynamic data = JsonSerializer.Deserialize<dynamic>(json, _jsonOptions);
+                        dynamic data = JsonSerializer.Deserialize<dynamic>(json, jsonOptions);
                         string type = data.type;
                         switch (type)
                         {
@@ -93,7 +78,7 @@ namespace SlackLineBridge.Controllers
                                 switch (eventType)
                                 {
                                     case "message":
-                                        if(data.@event.subtype == "bot_message")
+                                        if (data.@event.subtype == "bot_message")
                                         {
                                             return Ok();
                                         }
@@ -103,18 +88,18 @@ namespace SlackLineBridge.Controllers
                                         var slackChannel = slackChannels.FirstOrDefault(x => x.TeamId == teamId && x.ChannelId == channelId);
                                         if (slackChannel == null)
                                         {
-                                            _logger.LogInformation($"message from unknown slack channel: {teamId}/{channelId}");
+                                            logger.LogInformation("message from unknown slack channel: {teamId}/{channelId}", teamId, channelId);
                                             return Ok();
                                         }
 
                                         string text = data.@event.text;
                                         string userId = data.@event.user;
-                                        var user = await GetSlackUserNameAndIcon(userId);
+                                        var (userName, icon) = await GetSlackUserNameAndIcon(userId);
 
                                         JsonDynamicArray files = data.@event.files;
                                         SlackFile[] slackFiles = null;
 
-                                        if (files?.Any() == true)
+                                        if ((files?.Count ?? 0) > 0)
                                         {
                                             slackFiles = files.Cast<dynamic>().Select(x => new SlackFile
                                             {
@@ -124,14 +109,14 @@ namespace SlackLineBridge.Controllers
                                             }).ToArray();
                                         }
 
-                                        return await PushToLine(Request.Host.ToString(), slackChannel, user.icon, user.userName, text, slackFiles);
+                                        return await PushToLine(Request.Host.ToString(), slackChannel, icon, userName, text, slackFiles);
                                 }
                                 break;
                         }
                     }
                     else
                     {
-                        _logger.LogInformation("Slack signature missmatch.");
+                        logger.LogInformation("Slack signature missmatch.");
                     }
                 }
 
@@ -140,21 +125,25 @@ namespace SlackLineBridge.Controllers
 
         private async Task<(string userName, string icon)> GetSlackUserNameAndIcon(string userId)
         {
-            var client = _clientFactory.CreateClient("Slack");
+            var client = clientFactory.CreateClient("Slack");
             var result = await client.GetAsync($"https://slack.com/api/users.profile.get?user={userId}");
             var json = await result.Content.ReadAsStringAsync();
-            dynamic data = JsonSerializer.Deserialize<dynamic>(json, _jsonOptions);
+            dynamic data = JsonSerializer.Deserialize<dynamic>(json, jsonOptions);
             (string name, string icon) = (data.profile.display_name, data.profile.image_512);
 
             return (name, icon);
         }
 
+        [SuppressMessage("Style", "IDE1006:命名スタイル", Justification = "<保留中>")]
         private record SlackFile
         {
             public string urlPrivate { get; set; }
             public string thumb360 { get; set; }
             public string mimeType { get; set; }
         }
+
+        [GeneratedRegex(@"(\<(?<url>http[^\|\>]+)\|?.*?\>)")]
+        private static partial Regex UrlRegex();
 
         private async Task<IActionResult> PushToLine(string host, SlackChannel slackChannel, string userIconUrl, string userName, string text, SlackFile[] files = null)
         {
@@ -165,15 +154,15 @@ namespace SlackLineBridge.Controllers
             }
 
             //URLタグを抽出
-            var urls = _urlRegex.Matches(text);
+            var urls = UrlRegex().Matches(text);
 
-            var client = _clientFactory.CreateClient("Line");
+            var client = clientFactory.CreateClient("Line");
             foreach (var bridge in bridges)
             {
                 var lineChannel = _lineChannels.Channels.FirstOrDefault(x => x.Name == bridge.Line);
                 if (lineChannel == null)
                 {
-                    _logger.LogError($"bridge configured but cannot find target LineChannel: {bridge.Line}");
+                    logger.LogError("bridge configured but cannot find target LineChannel: {bridge.Line}", bridge.Line);
                     return Ok();
                 }
 
@@ -182,8 +171,9 @@ namespace SlackLineBridge.Controllers
                     {
                         type = "text",
                         altText = text,
-                        text = text,
-                        sender = new {
+                        text,
+                        sender = new
+                        {
                             name = userName,
                             iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
                         },
@@ -203,9 +193,9 @@ namespace SlackLineBridge.Controllers
                         }.Concat(urlMessages).ToArray()
                     };
                     var jsonStr = JsonSerializer.Serialize(json);
-                    _logger.LogInformation("Push message to LINE: " + jsonStr);
+                    logger.LogInformation("Push message to LINE: {jsonStr}", jsonStr);
                     var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
-                    _logger.LogInformation($"LINE API result [{result.StatusCode}]: " + await result.Content.ReadAsStringAsync());
+                    logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
                 }
 
                 if (files != null)
@@ -232,9 +222,9 @@ namespace SlackLineBridge.Controllers
                         messages = messages.ToArray()
                     };
                     var jsonStr = JsonSerializer.Serialize(json);
-                    _logger.LogInformation("Push images to LINE: " + jsonStr);
+                    logger.LogInformation("Push images to LINE: {jsonStr}", jsonStr);
                     var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
-                    _logger.LogInformation($"LINE API result [{result.StatusCode}]: " + await result.Content.ReadAsStringAsync());
+                    logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
                 }
             }
             return Ok();
@@ -243,9 +233,9 @@ namespace SlackLineBridge.Controllers
         [HttpPost("/line")]
         public async Task<IActionResult> LineAsync()
         {
-            if (!Request.Headers.ContainsKey("X-Line-Signature"))
+            if (!Request.Headers.TryGetValue("X-Line-Signature", out StringValues signature))
             {
-                _logger.LogInformation("X-Line-Signature header missing.");
+                logger.LogInformation("X-Line-Signature header missing.");
 
                 return BadRequest();
             }
@@ -261,9 +251,10 @@ namespace SlackLineBridge.Controllers
             }
             finally
             {
-                Response.OnCompleted(async () =>
+                Response.OnCompleted(() =>
                 {
-                    _lineRequestQueue.Enqueue((Request.Headers["X-Line-Signature"], json, host));
+                    lineRequestQueue.Enqueue((signature, json, host));
+                    return Task.CompletedTask;
                 });
             }
 
