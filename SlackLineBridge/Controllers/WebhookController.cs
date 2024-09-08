@@ -154,7 +154,7 @@ namespace SlackLineBridge.Controllers
             }
 
             //URLタグを抽出
-            var urls = UrlRegex().Matches(text);
+            text = UrlRegex().Replace(text, "${url}");
 
             var client = clientFactory.CreateClient("Line");
             foreach (var bridge in bridges)
@@ -178,11 +178,6 @@ namespace SlackLineBridge.Controllers
                             iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
                         },
                     };
-                    var urlMessages = urls.Select(x => x.Groups["url"].Value).Select(x => new
-                    {
-                        type = "text",
-                        text = x
-                    });
 
                     var json = new
                     {
@@ -190,7 +185,7 @@ namespace SlackLineBridge.Controllers
                         messages = new dynamic[]
                         {
                             message
-                        }.Concat(urlMessages).ToArray()
+                        }.ToArray()
                     };
                     var jsonStr = JsonSerializer.Serialize(json);
                     logger.LogInformation("Push message to LINE: {jsonStr}", jsonStr);
