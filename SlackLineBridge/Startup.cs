@@ -48,7 +48,6 @@ namespace SlackLineBridge
                     x.AddAWSProvider(awsLoggingConfig);
                 }
             });
-            services.AddControllers();
             services.AddHttpClient("Line", c =>
             {
                 c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Configuration["lineAccessToken"]);
@@ -69,6 +68,7 @@ namespace SlackLineBridge
             services.AddSingleton(jsonOptions);
             services.AddHostedService<LineMessageProcessingService>();
             services.AddHostedService<BackgroundAccessingService>();
+            services.AddControllers();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
