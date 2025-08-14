@@ -2,23 +2,20 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization.Samples;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
-using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
+using SlackLineBridge.Services;
 using SlackLineBridge.Utils;
 using static System.Text.Json.Serialization.Samples.JsonSerializerExtensions;
 
@@ -31,6 +28,7 @@ namespace SlackLineBridge.Controllers
         IOptionsSnapshot<SlackChannels> slackChannels,
         IOptionsSnapshot<LineChannels> lineChannels,
         IOptionsSnapshot<SlackLineBridges> bridges,
+        LineMessageProcessingService lineMessageProcessingService,
         ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
         IHttpClientFactory clientFactory,
         SlackSigningSecret slackSigningSecret,
@@ -40,6 +38,7 @@ namespace SlackLineBridge.Controllers
         private readonly LineChannels _lineChannels = lineChannels.Value;
         private readonly SlackLineBridges _bridges = bridges.Value;
         private readonly string _slackSigningSecret = slackSigningSecret.Secret;
+        private readonly LineMessageProcessingService _lineMessageProcessingService = lineMessageProcessingService;
 
         [HttpPost("/slack2")]
         public async Task<IActionResult> Slack2()
@@ -167,59 +166,72 @@ namespace SlackLineBridge.Controllers
                 }
 
                 {
-                    var message = new
+                    var messages = new List<dynamic>
                     {
-                        type = "text",
-                        altText = text,
-                        text,
-                        sender = new
+                        new
                         {
-                            name = userName,
-                            iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
-                        },
-                    };
-
-                    var json = new
-                    {
-                        to = lineChannel.Id,
-                        messages = new dynamic[]
-                        {
-                            message
-                        }.ToArray()
-                    };
-                    var jsonStr = JsonSerializer.Serialize(json);
-                    logger.LogInformation("Push message to LINE: {jsonStr}", jsonStr);
-                    var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
-                    logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
-                }
-
-                if (files != null)
-                {
-                    var messages = files.Where(x => x.mimeType.StartsWith("image")).Select(file =>
-                    {
-                        var urlPrivate = file.urlPrivate;
-                        var urlThumb360 = file.thumb360;
-                        return new
-                        {
-                            type = "image",
-                            originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlPrivate)}",
-                            previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlThumb360)}",
+                            type = "text",
+                            altText = text,
+                            text,
                             sender = new
                             {
                                 name = userName,
                                 iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
                             },
-                        };
-                    });
-                    var json = new
-                    {
-                        to = lineChannel.Id,
-                        messages = messages.ToArray()
+                        }
                     };
-                    var jsonStr = JsonSerializer.Serialize(json);
-                    logger.LogInformation("Push images to LINE: {jsonStr}", jsonStr);
-                    var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
-                    logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
+
+                    if (files != null)
+                    {
+                        var fileMessages = files.Where(x => x.mimeType.StartsWith("image")).Select(file =>
+                        {
+                            var urlPrivate = file.urlPrivate;
+                            var urlThumb360 = file.thumb360;
+                            return new
+                            {
+                                type = "image",
+                                originalContentUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlPrivate, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlPrivate)}",
+                                previewImageUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(urlThumb360, _slackSigningSecret)}/{HttpUtility.UrlEncode(urlThumb360)}",
+                                sender = new
+                                {
+                                    name = userName,
+                                    iconUrl = $"https://{host}/proxy/slack/{Crypt.GetHMACHex(userIconUrl, _slackSigningSecret)}/{HttpUtility.UrlEncode(userIconUrl)}"
+                                },
+                            };
+                        });
+                        messages.AddRange(fileMessages);
+                    }
+
+                    var replyToken = _lineMessageProcessingService.GetReplyToken(lineChannel.Id);
+                    if (replyToken != null)
+                    {
+                        var json = new
+                        {
+                            replyToken,
+                            messages = messages.ToArray()
+                        };
+                        var jsonStr = JsonSerializer.Serialize(json);
+                        logger.LogInformation("Push message to LINE (using replyToken): {jsonStr}", jsonStr);
+                        var result = await client.PostAsync($"message/reply", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
+                        logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
+                        if (result.IsSuccessStatusCode)
+                        {
+                            continue;
+                        }
+                    }
+
+                    // 通常のプッシュメッセージにフォールバック
+                    {
+                        var json = new
+                        {
+                            to = lineChannel.Id,
+                            messages = messages.ToArray()
+                        };
+                        var jsonStr = JsonSerializer.Serialize(json);
+                        logger.LogInformation("Push message to LINE: {jsonStr}", jsonStr);
+                        var result = await client.PostAsync($"message/push", new StringContent(jsonStr, Encoding.UTF8, "application/json"));
+                        logger.LogInformation("LINE API result [{result.StatusCode}]: {result.Content}", result.StatusCode, await result.Content.ReadAsStringAsync());
+                    }
                 }
             }
             return Ok();

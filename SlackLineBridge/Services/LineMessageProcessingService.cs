@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SlackLineBridge.Models;
 using SlackLineBridge.Models.Configurations;
 using SlackLineBridge.Utils;
 using System;
@@ -10,8 +9,6 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 using System.Net.Http;
-using System.Security.Cryptography;
-using System.Security.Policy;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -28,6 +25,8 @@ namespace SlackLineBridge.Services
         private readonly ILogger<LineMessageProcessingService> _logger;
         private readonly ConcurrentQueue<(string signature, string body, string host)> _queue;
         private readonly string _lineChannelSecret;
+        // key: LINE channel id, value: last reply token
+        private readonly ConcurrentDictionary<string, string> _lastReplyTokens = [];
 
         public LineMessageProcessingService(
             IOptionsMonitor<SlackChannels> slackChannels,
@@ -85,6 +84,14 @@ namespace SlackLineBridge.Services
                                     if (!bridges.Any())
                                     {
                                         continue;
+                                    }
+                                    if (e.TryGetProperty("replyToken", out var replyTokenElement))
+                                    {
+                                        var replyToken = replyTokenElement.GetString();
+                                        if (!string.IsNullOrEmpty(replyToken))
+                                        {
+                                            _lastReplyTokens.AddOrUpdate(lineChannel.Id, replyToken, (key, value) => replyToken);
+                                        }
                                     }
                                     var (userName, pictureUrl) = await GetLineProfileAsync(e);
 
@@ -152,6 +159,16 @@ namespace SlackLineBridge.Services
             }
 
             _logger.LogDebug($"LineMessageProcessing background task is stopped.");
+        }
+
+        public string GetReplyToken(string lineChannelID)
+        {
+            if (_lastReplyTokens.TryRemove(lineChannelID, out var token))
+            {
+                return token;
+            }
+
+            return null;
         }
 
         private async Task SendToSlack(string webhookUrl, string channelId, string pictureUrl, string userName, string text, string imageUrl)
