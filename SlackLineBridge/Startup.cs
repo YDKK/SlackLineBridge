@@ -66,7 +66,8 @@ namespace SlackLineBridge
             var jsonOptions = new JsonSerializerOptions();
             jsonOptions.EnableDynamicTypes();
             services.AddSingleton(jsonOptions);
-            services.AddHostedService<LineMessageProcessingService>();
+            services.AddSingleton<LineMessageProcessingService>();
+            services.AddHostedService(sp=>sp.GetRequiredService<LineMessageProcessingService>());
             services.AddHostedService<BackgroundAccessingService>();
             services.AddControllers();
         }
