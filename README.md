@@ -80,6 +80,31 @@ Amazon CloudWatch Logsを使う場合，AWSの資格情報を指定すること�
 }
 ```
 
+### S3互換メディアキャッシュ（任意）
+
+LINE/Slackの署名を検証した後、取得済みメディアをprivateなS3互換バケットに保存します。`config.json` の `MediaCache` で有効化します。未設定または `Enabled: false` では従来どおり上流から配信します。
+
+```jsonc
+{
+  "MediaCache": {
+    "Enabled": true,
+    "Endpoint": "https://s3.example.com", // AWS S3では空欄
+    "Region": "us-east-1",
+    "Bucket": "private-media-cache",
+    "KeyPrefix": "slack-line-bridge/media",
+    "ForcePathStyle": true, // MinIOなどで必要な場合
+    "AccessKey": "", // 両方空欄ならAWS SDK標準のcredential chainを使用
+    "SecretKey": ""
+  }
+}
+```
+
+有効時は `Region` と `Bucket` が必須です。明示資格情報を使う場合はAccessKey/SecretKeyを両方設定します。資格情報には対象prefix内の `s3:GetObject` と `s3:PutObject`、およびバケットの `s3:ListBucket` を許可してください。AWSではListBucket権限がないと不存在キーが403になる場合があり、このキャッシュは403をmissとして扱いません。バケットは公開せず、AWS側のBlock Public Accessも有効にしてください。保存キーにはprovider名とメディアID/URLのSHA-256だけを使います。
+
+画像・動画・その他のファイルをMIME typeに関係なく保存します。オブジェクトの自動削除は行わないため、必要ならバケットのLifecycleルールで保持期間を設定してください。miss時は上流の全データを一時ファイルへ保存してからS3へ登録するため、OSの一時領域には同時取得中のファイル合計を置ける空き容量が必要です。メモリには固定サイズのbufferで転送します。
+
+S3の読み書きに失敗した場合はキャッシュmissとして扱わずHTTP 503を返します。上流HTTPエラーのstatus codeは保持し、エラー本文はキャッシュしません。
+
 ## スクリーンショット
 
 Slack側  

@@ -22,5 +22,15 @@
   "lineAccessToken": "",
   "lineChannelSecret": "",
   "slackSigningSecret": "",
-  "slackAccessToken": ""
+  "slackAccessToken": "",
+  "MediaCache": {
+    "Enabled": false,
+    "Endpoint": "",
+    "Region": "us-east-1",
+    "Bucket": "",
+    "KeyPrefix": "slack-line-bridge/media",
+    "ForcePathStyle": false,
+    "AccessKey": "",
+    "SecretKey": ""
+  }
 }

@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Samples;
 using System.Threading.Tasks;
 using Amazon.Runtime;
+using Amazon.S3;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -60,6 +61,25 @@ namespace SlackLineBridge
             services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
+            var mediaCacheSection = Configuration.GetSection("MediaCache");
+            services.AddOptions<MediaCacheOptions>()
+                .Bind(mediaCacheSection)
+                .Validate(options => options.GetValidationErrors().Count == 0, "MediaCache configuration is invalid when Enabled is true.")
+                .ValidateOnStart();
+            var mediaCacheOptions = mediaCacheSection.Get<MediaCacheOptions>() ?? new MediaCacheOptions();
+            if (mediaCacheOptions.Enabled)
+            {
+                services.AddSingleton<IAmazonS3>(serviceProvider => MediaCacheS3ClientFactory.Create(
+                    serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaCacheOptions>>().Value));
+                services.AddSingleton<IMediaCacheStore>(serviceProvider => new S3MediaCacheStore(
+                    serviceProvider.GetRequiredService<IAmazonS3>(),
+                    serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaCacheOptions>>().Value.Bucket));
+            }
+            else
+            {
+                services.AddSingleton<IMediaCacheStore, NoOpMediaCacheStore>();
+            }
+            services.AddSingleton<IMediaProxyService, MediaProxyService>();
             services.AddSingleton<ConcurrentQueue<(string signature, string body, string host)>>(); //lineRequestQueue
             services.AddSingleton(new LineChannelSecret(Configuration["lineChannelSecret"]));
             services.AddSingleton(new SlackSigningSecret(Configuration["slackSigningSecret"]));
