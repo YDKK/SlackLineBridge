@@ -16,6 +16,8 @@ namespace SlackLineBridge.Models.Configurations
 
         public string KeyPrefix { get; set; } = "slack-line-bridge/media";
 
+        public long MaxObjectBytes { get; set; } = 256L * 1024 * 1024;
+
         public bool ForcePathStyle { get; set; }
 
         public string AccessKey { get; set; }
@@ -28,6 +30,11 @@ namespace SlackLineBridge.Models.Configurations
             if (!Enabled)
             {
                 return errors;
+            }
+
+            if (MaxObjectBytes <= 0)
+            {
+                errors.Add("MediaCache:MaxObjectBytes must be greater than zero when the media cache is enabled.");
             }
 
             if (string.IsNullOrWhiteSpace(Region))

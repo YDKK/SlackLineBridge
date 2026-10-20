@@ -1,13 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace SlackLineBridge.Models.Configurations
 {
     public class SlackSigningSecret
     {
         public string Secret { get; }
-        public SlackSigningSecret(string secret) => Secret = secret;
+        public SlackSigningSecret(string secret)
+        {
+            if (string.IsNullOrWhiteSpace(secret))
+            {
+                throw new ArgumentException("Slack signing secret must be configured.", nameof(secret));
+            }
+
+            Secret = secret;
+        }
     }
 }

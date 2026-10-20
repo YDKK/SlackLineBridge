@@ -88,6 +88,7 @@ LINE/Slackの署名を検証した後、取得済みメディアをprivateなS3�
 {
   "MediaCache": {
     "Enabled": true,
+    "MaxObjectBytes": 268435456, // 最大256 MiB
     "Endpoint": "https://s3.example.com", // AWS S3では空欄
     "Region": "us-east-1",
     "Bucket": "private-media-cache",
@@ -99,11 +100,13 @@ LINE/Slackの署名を検証した後、取得済みメディアをprivateなS3�
 }
 ```
 
-有効時は `Region` と `Bucket` が必須です。明示資格情報を使う場合はAccessKey/SecretKeyを両方設定します。資格情報には対象prefix内の `s3:GetObject` と `s3:PutObject`、およびバケットの `s3:ListBucket` を許可してください。AWSではListBucket権限がないと不存在キーが403になる場合があり、このキャッシュは403をmissとして扱いません。バケットは公開せず、AWS側のBlock Public Accessも有効にしてください。保存キーにはprovider名とメディアID/URLのSHA-256だけを使います。
+有効時は `Region` と `Bucket` が必須です。明示資格情報を使う場合はAccessKey/SecretKeyを両方設定します。資格情報には対象prefix内の `s3:GetObject` と `s3:PutObject`、およびバケットの `s3:ListBucket` を許可してください。AWSではListBucket権限がないと不存在キーが403になる場合があり、このキャッシュは403をミスとして扱いません。バケットは公開せず、AWS側のBlock Public Accessも有効にしてください。保存キーにはprovider名とメディアID/URLのSHA-256だけを使います。
 
-画像・動画・その他のファイルをMIME typeに関係なく保存します。オブジェクトの自動削除は行わないため、必要ならバケットのLifecycleルールで保持期間を設定してください。miss時は上流の全データを一時ファイルへ保存してからS3へ登録するため、OSの一時領域には同時取得中のファイル合計を置ける空き容量が必要です。メモリには固定サイズのbufferで転送します。
+キャッシュミス時に一時保存するオブジェクトの上限は `MaxObjectBytes`（既定256 MiB）です。超過した取得は失敗し、一時ファイルを削除します。
 
-S3の読み書きに失敗した場合はキャッシュmissとして扱わずHTTP 503を返します。上流HTTPエラーのstatus codeは保持し、エラー本文はキャッシュしません。
+画像・動画・その他のファイルをMIME typeに関係なく保存します。オブジェクトの自動削除は行わないため、必要ならバケットのLifecycleルールで保持期間を設定してください。ミス時は上流の全データを一時ファイルへ保存してからS3へ登録するため、OSの一時領域には同時取得中のファイル合計を置ける空き容量が必要です。メモリには固定サイズのbufferで転送します。
+
+S3の読み書きに失敗した場合はキャッシュミスとして扱わずHTTP 503を返します。上流HTTPエラーのstatus codeは保持し、エラー本文はキャッシュしません。
 
 ## スクリーンショット
 

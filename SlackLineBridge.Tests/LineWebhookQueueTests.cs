@@ -29,6 +29,7 @@ public sealed class LineWebhookQueueTests
 {
     private const string LineSecret = "test-line-channel-secret";
 
+    // 署名ヘッダー欠落または不正時に要求をキューへ登録しないことを確認する。
     [Fact]
     public async Task MissingAndInvalidSignaturesDoNotEnqueueRequests()
     {
@@ -46,6 +47,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal(marker, await ReadNextAsync(queue));
     }
 
+    // 正しい署名の要求をキューへ登録してからHTTP 200を返すことを確認する。
     [Fact]
     public async Task ValidSignatureIsEnqueuedBeforeHttpOkIsReturned()
     {
@@ -61,6 +63,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal("bridge.example", request.Host);
     }
 
+    // LINE署名を本文の受信時バイト列そのもので検証することを確認する。
     [Fact]
     public async Task SignatureValidationUsesExactRawRequestBytes()
     {
@@ -76,6 +79,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal(body, (await ReadNextAsync(queue)).Body);
     }
 
+    // 本文読み取り中に要求が中断された場合はキューへ登録しないことを確認する。
     [Fact]
     public async Task AbortedRequestBodyReadDoesNotEnqueue()
     {
@@ -97,6 +101,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal(marker, await ReadNextAsync(queue));
     }
 
+    // LINE webhookの応答が外部プロフィール取得の完了を待たないことを確認する。
     [Fact]
     public async Task HttpAcknowledgementDoesNotWaitForExternalProfileRequest()
     {
@@ -129,6 +134,7 @@ public sealed class LineWebhookQueueTests
         await StopAsync(service);
     }
 
+    // Kestrel経由で早期応答し、不正署名と満杯キューを拒否することを確認する。
     [Fact]
     public async Task KestrelPipelineAcknowledgesBeforeProcessingAndRejectsInvalidOrFullQueue()
     {
@@ -215,6 +221,7 @@ public sealed class LineWebhookQueueTests
         }
     }
 
+    // キュー内の連続した要求を待機遅延なく処理することを確認する。
     [Fact]
     public async Task ConsumerProcessesConsecutiveRequestsWithoutPollingDelay()
     {
@@ -246,6 +253,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal(2, slackPosts);
     }
 
+    // 不正形式や処理失敗の後も次の要求を処理し、ログに秘密を含めないことを確認する。
     [Fact]
     public async Task MalformedAndFailedRequestsDoNotStopTheNextRequestAndLogsOmitSecrets()
     {
@@ -291,6 +299,7 @@ public sealed class LineWebhookQueueTests
         Assert.DoesNotContain("slack-webhook-token", logs, StringComparison.Ordinal);
     }
 
+    // LINEプロフィール取得失敗時に代替プロフィールを使って転送を続けることを確認する。
     [Fact]
     public async Task NonSuccessProfileResponseUsesFallbackAndStillForwardsMessage()
     {
@@ -319,6 +328,7 @@ public sealed class LineWebhookQueueTests
         Assert.Contains(provider.Messages, message => message.Contains("BadGateway", StringComparison.Ordinal));
     }
 
+    // Slack送信失敗をログに記録し、後続要求の処理を続けることを確認する。
     [Fact]
     public async Task NonSuccessSlackResponseIsLoggedAsFailureAndNextRequestContinues()
     {
@@ -355,6 +365,7 @@ public sealed class LineWebhookQueueTests
         Assert.Single(provider.Messages, message => message.Contains("Post to Slack returned status", StringComparison.Ordinal));
     }
 
+    // キュー満杯時に待たずにHTTP 503を返すことを確認する。
     [Fact]
     public async Task FullQueueReturnsServiceUnavailableWithoutWaiting()
     {
@@ -371,6 +382,7 @@ public sealed class LineWebhookQueueTests
         Assert.Equal(queued, await ReadNextAsync(queue));
     }
 
+    // 正常停止時に受付済み要求を処理し、新しい要求を受け付けないことを確認する。
     [Fact]
     public async Task GracefulStopDrainsAcceptedRequestsAndClosesQueue()
     {
@@ -396,6 +408,7 @@ public sealed class LineWebhookQueueTests
         Assert.False(queue.TryEnqueue(QueueRequest("after-stop", "bridge.example")));
     }
 
+    // 停止期限に達したとき実行中の外部要求をキャンセルすることを確認する。
     [Fact]
     public async Task ShutdownDeadlineCancelsActiveExternalRequest()
     {

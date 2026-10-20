@@ -37,7 +37,9 @@ namespace SlackLineBridge
                         {
                             o.Dsn = sentryDsn;
                             o.TracesSampleRate = 0;
-                            o.SendDefaultPii = true;
+                            o.SendDefaultPii = false;
+                            o.SetBeforeSend(SentryPrivacyFilter.RemoveRequestMetadata);
+                            o.SetBeforeBreadcrumb(SentryPrivacyFilter.DropHttpBreadcrumb);
                         });
                     }
                     webBuilder.UseStartup<Startup>();

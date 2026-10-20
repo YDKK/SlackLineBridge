@@ -22,6 +22,7 @@ namespace SlackLineBridge.Tests;
 
 public sealed class S3MediaCacheStoreTests
 {
+    // S3互換エンドポイントで署名付きの保存・取得・欠損・範囲取得が動作することを確認する。
     [Fact]
     public async Task AwsSdkV4UsesS3CompatibleWireOperationsForPutGetMissingAndRange()
     {
@@ -80,6 +81,7 @@ public sealed class S3MediaCacheStoreTests
         Assert.False(server.SawOptionalChecksumHeaders);
     }
 
+    // バケット不存在をキャッシュミスではなくストレージ障害として扱うことを確認する。
     [Fact]
     public async Task NoSuchBucketIsAStorageFailureAndNeverACacheMiss()
     {

@@ -160,6 +160,12 @@ namespace SlackLineBridge.Services
                     return new MediaProxyResponse(statusCode, passthrough, contentType, contentLength);
                 }
 
+                if (response.Content.Headers.ContentLength is long declaredLength
+                    && declaredLength > _options.MaxObjectBytes)
+                {
+                    return new MediaProxyResponse((int)HttpStatusCode.BadGateway);
+                }
+
                 var responseContentType = GetContentType(response.Content.Headers.ContentType);
                 tempPath = Path.Combine(Path.GetTempPath(), $"slacklinebridge-mediacache-{Guid.NewGuid():N}.tmp");
                 try
@@ -179,7 +185,15 @@ namespace SlackLineBridge.Services
 
                 await using (var upstreamStream = await response.Content.ReadAsStreamAsync(cancellationToken))
                 {
-                    await CopyToTempFileAsync(upstreamStream, tempFile, cancellationToken);
+                    var copiedWithinLimit = await CopyToTempFileAsync(
+                        upstreamStream,
+                        tempFile,
+                        _options.MaxObjectBytes,
+                        cancellationToken);
+                    if (!copiedWithinLimit)
+                    {
+                        return new MediaProxyResponse((int)HttpStatusCode.BadGateway);
+                    }
                 }
 
                 try
@@ -253,15 +267,34 @@ namespace SlackLineBridge.Services
                 supportsRangeRequests: true);
         }
 
-        private static async Task CopyToTempFileAsync(Stream source, FileStream destination, CancellationToken cancellationToken)
+        private static async Task<bool> CopyToTempFileAsync(
+            Stream source,
+            FileStream destination,
+            long maxBytes,
+            CancellationToken cancellationToken)
         {
+            if (maxBytes <= 0)
+            {
+                return false;
+            }
+
             var buffer = new byte[BufferSize];
+            long totalBytes = 0;
             while (true)
             {
-                var bytesRead = await source.ReadAsync(buffer.AsMemory(), cancellationToken);
+                var remainingBytes = maxBytes - totalBytes;
+                var readSize = remainingBytes >= buffer.Length
+                    ? buffer.Length
+                    : (int)remainingBytes + 1;
+                var bytesRead = await source.ReadAsync(buffer.AsMemory(0, readSize), cancellationToken);
                 if (bytesRead == 0)
                 {
-                    return;
+                    return true;
+                }
+
+                if (bytesRead > remainingBytes)
+                {
+                    return false;
                 }
 
                 try
@@ -272,6 +305,8 @@ namespace SlackLineBridge.Services
                 {
                     throw new MediaCacheStorageException("Could not write a media cache temporary file.", exception);
                 }
+
+                totalBytes += bytesRead;
             }
         }
 

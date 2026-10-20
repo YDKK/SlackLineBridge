@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Samples;
@@ -31,6 +30,13 @@ namespace SlackLineBridge
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            ValidateRequiredSetting("lineChannelSecret");
+            ValidateRequiredSetting("slackSigningSecret");
+            ValidateRequiredSetting("lineAccessToken");
+            ValidateRequiredSetting("slackAccessToken");
+
+            // HttpClientFactory logs request URLs by default. Slack webhook URLs contain a secret.
+            services.ConfigureHttpClientDefaults(builder => builder.RemoveAllLoggers());
             services.AddLogging(x =>
             {
                 x.AddConfiguration(Configuration.GetSection("Logging"));
@@ -57,6 +63,13 @@ namespace SlackLineBridge
             {
                 c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Configuration["slackAccessToken"]);
             });
+            services.AddHttpClient("SlackMedia")
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false
+                })
+                .AddHttpMessageHandler(() => new SlackMediaHandler(Configuration["slackAccessToken"]));
             services.Configure<SlackChannels>(x => x.Channels = Configuration.GetSection("slackChannels").Get<SlackChannel[]>());
             services.Configure<LineChannels>(x => x.Channels = Configuration.GetSection("lineChannels").Get<LineChannel[]>());
             services.Configure<SlackLineBridges>(x => x.Bridges = Configuration.GetSection("slackLineBridges").Get<Models.Configurations.SlackLineBridge[]>());
@@ -106,6 +119,14 @@ namespace SlackLineBridge
             {
                 endpoints.MapControllers();
             });
+        }
+
+        private void ValidateRequiredSetting(string key)
+        {
+            if (string.IsNullOrWhiteSpace(Configuration[key]))
+            {
+                throw new InvalidOperationException($"Required configuration '{key}' must be a non-empty value.");
+            }
         }
     }
 }

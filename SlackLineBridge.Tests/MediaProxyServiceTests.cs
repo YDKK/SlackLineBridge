@@ -26,6 +26,7 @@ public sealed class MediaProxyServiceTests
 {
     private const string UpstreamUrl = "https://media.example.test/object";
 
+    // 初回取得でMIME typeを問わず保存し、2回目はキャッシュから返すことを確認する。
     [Fact]
     public async Task FirstRequestStoresEveryMimeTypeAndSecondRequestUsesCache()
     {
@@ -54,6 +55,7 @@ public sealed class MediaProxyServiceTests
         Assert.Single(store.Keys.Distinct());
     }
 
+    // 無効なLINE署名ではキャッシュや上流へアクセスしないことを確認する。
     [Fact]
     public async Task InvalidLineSignatureDoesNotAccessCacheOrUpstream()
     {
@@ -75,6 +77,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    // キャッシュキーがproviderごとに分かれ、元の識別情報を含まないことを確認する。
     [Fact]
     public void CacheKeysSeparateProvidersAndDoNotContainIdentity()
     {
@@ -91,6 +94,7 @@ public sealed class MediaProxyServiceTests
         Assert.EndsWith(lineKey.Split('/').Last(), slackKey);
     }
 
+    // キャッシュ無効時は設定を許容し、有効時は不正な設定を拒否することを確認する。
     [Fact]
     public void CacheConfigurationIsValidatedOnlyWhenEnabled()
     {
@@ -102,6 +106,7 @@ public sealed class MediaProxyServiceTests
         Assert.Contains(errors, error => error.Contains("MediaCache:Bucket", StringComparison.Ordinal));
     }
 
+    // キャッシュmiss/hitのRange応答と通常hitの本文・ヘッダーが正しいことを確認する。
     [Fact]
     public async Task MvcReturnsCorrectRangeHeadersForMissAndHitAndFullContentOnUnrangedHit()
     {
@@ -145,6 +150,7 @@ public sealed class MediaProxyServiceTests
         mvcServices.Dispose();
     }
 
+    // キャッシュhitで単一byte rangeの内容と応答が正しいことを確認する。
     [Fact]
     public async Task CacheHitUsesSingleByteRangeFromS3Object()
     {
@@ -167,6 +173,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(1, handler.RequestCount);
     }
 
+    // S3保存失敗時に一時ファイルを削除し、成功応答を返さないことを確認する。
     [Fact]
     public async Task FailedPutDeletesTemporaryFileAndDoesNotReturnSuccess()
     {
@@ -183,6 +190,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(0, store.StoredObjectCount);
     }
 
+    // 上流読み取りのキャンセル時に一時ファイルを削除することを確認する。
     [Fact]
     public async Task AbortedUpstreamReadDeletesTemporaryFile()
     {
@@ -206,6 +214,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(0, store.StoredObjectCount);
     }
 
+    // 上流エラーのstatus codeを保持し、エラー本文をキャッシュしないことを確認する。
     [Fact]
     public async Task UpstreamErrorStatusIsKeptAndErrorBodyIsNotCached()
     {
@@ -224,6 +233,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(0, store.PutCount);
     }
 
+    // キャッシュ無効時にストレージへアクセスせず上流から取得することを確認する。
     [Fact]
     public async Task DisabledCacheDoesNotAccessStorage()
     {
@@ -242,6 +252,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal(1, handler.RequestCount);
     }
 
+    // ストレージ障害時に503を返し、上流へアクセスしないことを確認する。
     [Fact]
     public async Task StorageFailureReturns503WithoutCallingUpstream()
     {
@@ -258,6 +269,7 @@ public sealed class MediaProxyServiceTests
         mvcServices.Dispose();
     }
 
+    // 同じオブジェクトへの並行missで上流取得と保存を一度だけ行うことを確認する。
     [Fact]
     public async Task ConcurrentMissesForSameObjectOnlyFetchAndStoreOnce()
     {

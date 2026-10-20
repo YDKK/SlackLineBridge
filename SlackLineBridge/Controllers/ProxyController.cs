@@ -30,13 +30,13 @@ namespace SlackLineBridge.Controllers
         [HttpGet("line/{token}/{id}")]
         public async Task<IActionResult> Line(string id, string token)
         {
-            if (token != Crypt.GetHMACHex(id, _lineChannelSecret))
+            if (!Crypt.FixedTimeEqualsAscii(Crypt.GetHMACHex(id, _lineChannelSecret), token))
             {
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
             var client = clientFactory.CreateClient("Line");
-            var url = $"https://api-data.line.me/v2/bot/message/{id}/content";
+            var url = $"https://api-data.line.me/v2/bot/message/{Uri.EscapeDataString(id)}/content";
 
             return await ProxyContent(client, url, MediaCacheSource.Line, id);
         }
@@ -45,12 +45,12 @@ namespace SlackLineBridge.Controllers
         public async Task<IActionResult> Slack(string encodedUrl, string token)
         {
             var url = HttpUtility.UrlDecode(encodedUrl);
-            if (token != Crypt.GetHMACHex(url, _slackSigningSecret))
+            if (!Crypt.FixedTimeEqualsAscii(Crypt.GetHMACHex(url, _slackSigningSecret), token))
             {
                 return new StatusCodeResult((int)HttpStatusCode.Forbidden);
             }
 
-            var client = clientFactory.CreateClient("Slack");
+            var client = clientFactory.CreateClient("SlackMedia");
 
             return await ProxyContent(client, url, MediaCacheSource.Slack, url);
         }
@@ -91,6 +91,8 @@ namespace SlackLineBridge.Controllers
             }
 
             Response.StatusCode = result.StatusCode;
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
             if (!result.EnableRangeProcessing && result.ContentLength.HasValue)
             {
                 Response.ContentLength = result.ContentLength.Value;
