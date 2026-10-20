@@ -5,6 +5,8 @@ VisualStudioVersion = 17.11.35222.181
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SlackLineBridge", "SlackLineBridge\SlackLineBridge.csproj", "{20565EFE-65C3-4EB1-8E09-7C9A9324BB66}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SlackLineBridge.Tests", "SlackLineBridge.Tests\SlackLineBridge.Tests.csproj", "{1E45355C-7D3C-4B87-AC4A-07B35DA9DF1D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{20565EFE-65C3-4EB1-8E09-7C9A9324BB66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20565EFE-65C3-4EB1-8E09-7C9A9324BB66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20565EFE-65C3-4EB1-8E09-7C9A9324BB66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E45355C-7D3C-4B87-AC4A-07B35DA9DF1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E45355C-7D3C-4B87-AC4A-07B35DA9DF1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E45355C-7D3C-4B87-AC4A-07B35DA9DF1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E45355C-7D3C-4B87-AC4A-07B35DA9DF1D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

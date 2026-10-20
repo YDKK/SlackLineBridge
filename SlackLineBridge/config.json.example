@@ -22,5 +22,16 @@
   "lineAccessToken": "",
   "lineChannelSecret": "",
   "slackSigningSecret": "",
-  "slackAccessToken": ""
+  "slackAccessToken": "",
+  "MediaCache": {
+    "Enabled": false,
+    "MaxObjectBytes": 268435456,
+    "Endpoint": "",
+    "Region": "us-east-1",
+    "Bucket": "",
+    "KeyPrefix": "slack-line-bridge/media",
+    "ForcePathStyle": false,
+    "AccessKey": "",
+    "SecretKey": ""
+  }
 }
