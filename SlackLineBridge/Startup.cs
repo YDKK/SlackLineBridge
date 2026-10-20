@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
@@ -80,7 +79,7 @@ namespace SlackLineBridge
                 services.AddSingleton<IMediaCacheStore, NoOpMediaCacheStore>();
             }
             services.AddSingleton<IMediaProxyService, MediaProxyService>();
-            services.AddSingleton<ConcurrentQueue<(string signature, string body, string host)>>(); //lineRequestQueue
+            services.AddSingleton<LineWebhookQueue>();
             services.AddSingleton(new LineChannelSecret(Configuration["lineChannelSecret"]));
             services.AddSingleton(new SlackSigningSecret(Configuration["slackSigningSecret"]));
             var jsonOptions = new JsonSerializerOptions();
@@ -88,7 +87,6 @@ namespace SlackLineBridge
             services.AddSingleton(jsonOptions);
             services.AddSingleton<LineMessageProcessingService>();
             services.AddHostedService(sp=>sp.GetRequiredService<LineMessageProcessingService>());
-            services.AddHostedService<BackgroundAccessingService>();
             services.AddControllers();
         }
 

@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -29,8 +29,9 @@ namespace SlackLineBridge.Controllers
         IOptionsSnapshot<LineChannels> lineChannels,
         IOptionsSnapshot<SlackLineBridges> bridges,
         LineMessageProcessingService lineMessageProcessingService,
-        ConcurrentQueue<(string signature, string body, string host)> lineRequestQueue,
+        LineWebhookQueue lineRequestQueue,
         IHttpClientFactory clientFactory,
+        LineChannelSecret lineChannelSecret,
         SlackSigningSecret slackSigningSecret,
         JsonSerializerOptions jsonOptions) : ControllerBase
     {
@@ -38,7 +39,9 @@ namespace SlackLineBridge.Controllers
         private readonly LineChannels _lineChannels = lineChannels.Value;
         private readonly SlackLineBridges _bridges = bridges.Value;
         private readonly string _slackSigningSecret = slackSigningSecret.Secret;
+        private readonly string _lineChannelSecret = lineChannelSecret.Secret;
         private readonly LineMessageProcessingService _lineMessageProcessingService = lineMessageProcessingService;
+        private readonly LineWebhookQueue _lineRequestQueue = lineRequestQueue;
 
         [HttpPost("/slack2")]
         public async Task<IActionResult> Slack2()
@@ -240,31 +243,42 @@ namespace SlackLineBridge.Controllers
         [HttpPost("/line")]
         public async Task<IActionResult> LineAsync()
         {
-            if (!Request.Headers.TryGetValue("X-Line-Signature", out StringValues signature))
+            if (!Request.Headers.TryGetValue("X-Line-Signature", out StringValues signature) || StringValues.IsNullOrEmpty(signature))
             {
-                logger.LogInformation("X-Line-Signature header missing.");
-
+                logger.LogInformation("LINE webhook rejected because its signature header is missing.");
                 return BadRequest();
             }
 
-            string json = null;
-            string host = null;
-            try
+            using var bodyStream = new MemoryStream();
+            await Request.Body.CopyToAsync(bodyStream, HttpContext.RequestAborted);
+            var body = bodyStream.ToArray();
+            HttpContext.RequestAborted.ThrowIfCancellationRequested();
+            if (!IsValidLineSignature(body, signature.ToString()))
             {
-                using var reader = new StreamReader(Request.Body);
-                json = await reader.ReadToEndAsync();
-                host = Request.Host.ToString();
-                return Ok();
-            }
-            finally
-            {
-                Response.OnCompleted(() =>
-                {
-                    lineRequestQueue.Enqueue((signature, json, host));
-                    return Task.CompletedTask;
-                });
+                logger.LogInformation("LINE webhook rejected because its signature is invalid.");
+                return BadRequest();
             }
 
+            HttpContext.RequestAborted.ThrowIfCancellationRequested();
+            if (!_lineRequestQueue.TryEnqueue(new LineWebhookRequest(body, Request.Host.ToString())))
+            {
+                logger.LogWarning("LINE webhook queue is full or closed; rejecting request.");
+                return StatusCode(503);
+            }
+
+            return Ok();
+        }
+
+        private bool IsValidLineSignature(byte[] body, string providedSignature)
+        {
+            Span<byte> providedHash = stackalloc byte[32];
+            if (!Convert.TryFromBase64String(providedSignature, providedHash, out var bytesWritten) || bytesWritten != providedHash.Length)
+            {
+                return false;
+            }
+
+            var expectedHash = Crypt.CalcHMAC(body, _lineChannelSecret);
+            return CryptographicOperations.FixedTimeEquals(expectedHash, providedHash);
         }
 
         [HttpGet("/health")]

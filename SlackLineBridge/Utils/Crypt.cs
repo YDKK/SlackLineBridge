@@ -12,10 +12,16 @@ namespace SlackLineBridge.Utils
         public static byte[] CalcHMAC(string text, string key)
         {
             var encoding = new UTF8Encoding();
+            return CalcHMAC(encoding.GetBytes(text), encoding.GetBytes(key));
+        }
 
-            var textBytes = encoding.GetBytes(text);
-            var keyBytes = encoding.GetBytes(key);
+        public static byte[] CalcHMAC(byte[] textBytes, string key)
+        {
+            return CalcHMAC(textBytes, new UTF8Encoding().GetBytes(key));
+        }
 
+        private static byte[] CalcHMAC(byte[] textBytes, byte[] keyBytes)
+        {
             using var hash = new HMACSHA256(keyBytes);
             return hash.ComputeHash(textBytes);
         }
