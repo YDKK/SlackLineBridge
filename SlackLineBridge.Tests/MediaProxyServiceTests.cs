@@ -110,6 +110,7 @@ public sealed class MediaProxyServiceTests
     [Theory]
     [InlineData("video/mp4")]
     [InlineData("audio/mp4")]
+    [InlineData("Video/MP4; codecs=\"avc1.64001f, mp4a.40.2\"")]
     public async Task MvcReturnsPlayableMediaHeadersForMissAndHitAndFullContentOnUnrangedHit(string contentType)
     {
         var body = new byte[] { 10, 11, 12, 13, 14, 15 };
@@ -320,7 +321,7 @@ public sealed class MediaProxyServiceTests
         {
             Content = new ByteArrayContent(body)
             {
-                Headers = { ContentType = new MediaTypeHeaderValue(contentType) }
+                Headers = { ContentType = MediaTypeHeaderValue.Parse(contentType) }
             }
         };
     }
@@ -329,7 +330,7 @@ public sealed class MediaProxyServiceTests
     {
         Assert.Equal(contentType, response.ContentType);
         Assert.Equal("nosniff", response.Headers["X-Content-Type-Options"].ToString());
-        Assert.Equal("sandbox; default-src 'none'; media-src 'self'", response.Headers["Content-Security-Policy"].ToString());
+        Assert.Equal("sandbox allow-same-origin; default-src 'none'; media-src 'self'", response.Headers["Content-Security-Policy"].ToString());
         Assert.False(response.Headers.ContainsKey("Content-Disposition"));
     }
 
