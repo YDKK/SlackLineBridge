@@ -92,7 +92,8 @@ namespace SlackLineBridge.Controllers
 
             Response.StatusCode = result.StatusCode;
             Response.Headers["X-Content-Type-Options"] = "nosniff";
-            Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+            // ブラウザの内蔵プレーヤーが同一オリジンの動画・音声を読み込めるようにする。
+            Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'; media-src 'self'";
             if (!result.EnableRangeProcessing && result.ContentLength.HasValue)
             {
                 Response.ContentLength = result.ContentLength.Value;

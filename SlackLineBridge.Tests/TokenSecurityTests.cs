@@ -77,7 +77,7 @@ public sealed class TokenSecurityTests
 
         Assert.Equal("SlackMedia", clientFactory.LastName);
         Assert.Equal("nosniff", controller.Response.Headers["X-Content-Type-Options"].ToString());
-        Assert.Equal("sandbox; default-src 'none'", controller.Response.Headers["Content-Security-Policy"].ToString());
+        Assert.Equal("sandbox; default-src 'none'; media-src 'self'", controller.Response.Headers["Content-Security-Policy"].ToString());
     }
 
     private static ProxyController CreateController(CountingHttpClientFactory clientFactory, CountingMediaProxyService mediaService)
