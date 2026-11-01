@@ -106,13 +106,16 @@ public sealed class MediaProxyServiceTests
         Assert.Contains(errors, error => error.Contains("MediaCache:Bucket", StringComparison.Ordinal));
     }
 
-    // キャッシュmiss/hitのRange応答と通常hitの本文・ヘッダーが正しいことを確認する。
-    [Fact]
-    public async Task MvcReturnsCorrectRangeHeadersForMissAndHitAndFullContentOnUnrangedHit()
+    // 動画・音声のキャッシュmiss/hitで再生用CSPとRange応答、通常応答の本文・ヘッダーを確認する。
+    [Theory]
+    [InlineData("video/mp4")]
+    [InlineData("audio/mp4")]
+    [InlineData("Video/MP4; codecs=\"avc1.64001f, mp4a.40.2\"")]
+    public async Task MvcReturnsPlayableMediaHeadersForMissAndHitAndFullContentOnUnrangedHit(string contentType)
     {
         var body = new byte[] { 10, 11, 12, 13, 14, 15 };
         var store = new FakeMediaCacheStore();
-        var handler = new StaticHandler(_ => Task.FromResult(Response(body, "video/mp4")));
+        var handler = new StaticHandler(_ => Task.FromResult(Response(body, contentType)));
         using var client = new HttpClient(handler);
         var service = CreateService(store);
         var mvcServices = new ServiceCollection().AddLogging().AddMvcCore().Services.BuildServiceProvider();
@@ -125,6 +128,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal("bytes", miss.Context.Response.Headers["Accept-Ranges"].ToString());
         Assert.Equal(3, miss.Context.Response.ContentLength);
         Assert.Equal(new byte[] { 11, 12, 13 }, ((MemoryStream)miss.Context.Response.Body).ToArray());
+        AssertPlaybackHeaders(miss.Context.Response, contentType);
 
         var hit = await ExecuteLineAsync(mvcServices, client, service, "bytes=1-3");
         Assert.Equal((int)HttpStatusCode.PartialContent, hit.Context.Response.StatusCode);
@@ -132,6 +136,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal("bytes", hit.Context.Response.Headers["Accept-Ranges"].ToString());
         Assert.Equal(3, hit.Context.Response.ContentLength);
         Assert.Equal(new byte[] { 11, 12, 13 }, ((MemoryStream)hit.Context.Response.Body).ToArray());
+        AssertPlaybackHeaders(hit.Context.Response, contentType);
 
         var fullHit = await ExecuteLineAsync(mvcServices, client, service, null);
         Assert.Equal((int)HttpStatusCode.OK, fullHit.Context.Response.StatusCode);
@@ -139,6 +144,7 @@ public sealed class MediaProxyServiceTests
         Assert.Equal("bytes", fullHit.Context.Response.Headers["Accept-Ranges"].ToString());
         Assert.False(fullHit.Context.Response.Headers.ContainsKey("Content-Range"));
         Assert.Equal(body, ((MemoryStream)fullHit.Context.Response.Body).ToArray());
+        AssertPlaybackHeaders(fullHit.Context.Response, contentType);
 
         var unsatisfied = await ExecuteLineAsync(mvcServices, client, service, "bytes=99-100");
         Assert.Equal((int)HttpStatusCode.RequestedRangeNotSatisfiable, unsatisfied.Context.Response.StatusCode);
@@ -315,9 +321,17 @@ public sealed class MediaProxyServiceTests
         {
             Content = new ByteArrayContent(body)
             {
-                Headers = { ContentType = new MediaTypeHeaderValue(contentType) }
+                Headers = { ContentType = MediaTypeHeaderValue.Parse(contentType) }
             }
         };
+    }
+
+    private static void AssertPlaybackHeaders(HttpResponse response, string contentType)
+    {
+        Assert.Equal(contentType, response.ContentType);
+        Assert.Equal("nosniff", response.Headers["X-Content-Type-Options"].ToString());
+        Assert.Equal("sandbox allow-same-origin; default-src 'none'; media-src 'self'", response.Headers["Content-Security-Policy"].ToString());
+        Assert.False(response.Headers.ContainsKey("Content-Disposition"));
     }
 
     private static async Task<byte[]> ReadAllAsync(Stream stream)

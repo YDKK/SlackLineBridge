@@ -64,13 +64,18 @@ public sealed class TokenSecurityTests
         Assert.Equal(0, mediaService.RequestCount);
     }
 
-    // Slackメディアには専用クライアントを使い、安全な応答ヘッダーを付けることを確認する。
-    [Fact]
-    public async Task ProxyUsesSlackMediaClientAndSandboxResponseHeaders()
+    // HTML・SVG・不明な形式には同一オリジン権限を与えず、専用クライアントと安全なヘッダーを使うことを確認する。
+    [Theory]
+    [InlineData(null)]
+    [InlineData("text/html")]
+    [InlineData("image/svg+xml")]
+    [InlineData("application/octet-stream")]
+    [InlineData("video/mp4; codecs=\"unterminated")]
+    public async Task ProxyUsesSlackMediaClientAndKeepsNonMediaContentIsolated(string? contentType)
     {
         const string url = "https://files.slack.com/files-private/file";
         var clientFactory = new CountingHttpClientFactory();
-        var mediaService = new CountingMediaProxyService();
+        var mediaService = new CountingMediaProxyService { ContentType = contentType };
         var controller = CreateController(clientFactory, mediaService);
 
         await controller.Slack(Uri.EscapeDataString(url), Crypt.GetHMACHex(url, "slack-secret"));
@@ -109,6 +114,7 @@ public sealed class TokenSecurityTests
     {
         public int RequestCount { get; private set; }
         public string? Url { get; private set; }
+        public string? ContentType { get; init; }
 
         public Task<MediaProxyResponse> GetAsync(
             HttpClient client,
@@ -121,7 +127,7 @@ public sealed class TokenSecurityTests
         {
             RequestCount++;
             Url = url;
-            return Task.FromResult(new MediaProxyResponse((int)HttpStatusCode.OK));
+            return Task.FromResult(new MediaProxyResponse((int)HttpStatusCode.OK, contentType: ContentType));
         }
     }
 }

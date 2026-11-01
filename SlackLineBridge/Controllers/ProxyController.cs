@@ -92,7 +92,13 @@ namespace SlackLineBridge.Controllers
 
             Response.StatusCode = result.StatusCode;
             Response.Headers["X-Content-Type-Options"] = "nosniff";
-            Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+            var isAudioOrVideo = MediaTypeHeaderValue.TryParse(result.ContentType, out var contentType)
+                && (contentType.Type.Equals("audio", StringComparison.OrdinalIgnoreCase)
+                    || contentType.Type.Equals("video", StringComparison.OrdinalIgnoreCase));
+            // 動画・音声はoriginがnullになると内蔵プレーヤーの読み込みがCORSで拒否される。
+            Response.Headers["Content-Security-Policy"] = isAudioOrVideo
+                ? "sandbox allow-same-origin; default-src 'none'; media-src 'self'"
+                : "sandbox; default-src 'none'";
             if (!result.EnableRangeProcessing && result.ContentLength.HasValue)
             {
                 Response.ContentLength = result.ContentLength.Value;
